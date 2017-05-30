@@ -1,0 +1,22 @@
+{
+  "name": "spoom-php/mvc",
+  "description": "MVC for Spoom Framework",
+  "keywords": [ "spoom", "mvc" ],
+  "type": "spoom-extension",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Nagy Samu"
+    }
+  ],
+
+  "require": {
+    "php": "^7.1.0",
+    "spoom-php/composer": "^1.0.0",
+    "spoom-php/core": "@dev"
+  },
+
+  "autoload": {
+    "psr-4": { "Spoom\\MVC\\": "src/extension/" }
+  }
+}
