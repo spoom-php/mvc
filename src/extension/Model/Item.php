@@ -97,15 +97,17 @@ class Item extends Storage implements ItemInterface {
   private $persistent;
 
   /**
-   * @param array          $context item data (with ot without key)
-   * @param ModelInterface $model   item handler model
-   * @param bool|null      $exist   initial exists state
+   * @param ModelInterface $model
+   * @param array          $context
+   * @param array|null     $key
+   *
+   * @throws \TypeError
    */
-  public function __construct( ModelInterface $model, array $context ) {
+  public function __construct( ModelInterface $model, array $context, ?array $key = null ) {
     parent::__construct( $context );
 
     $this->_model = $model;
-    $this->_key   = $this->_model->key( $context );
+    $this->_key   = $key;
   }
 
   //
@@ -113,7 +115,7 @@ class Item extends Storage implements ItemInterface {
     if( !isset( $this->_key ) ) throw new \LogicException( "Item's key can't be empty..there is nothing to fetch!" );
     else {
 
-      $item             = $this->_model->statement( $this->_key )->get();
+      $item             = $this->_model->set( $this->_key )->get();
       $this->persistent = Collection::read( $item ?? [] );
 
       if( $overwrite ) {
@@ -134,9 +136,9 @@ class Item extends Storage implements ItemInterface {
     $data = $all || !$exist ? Collection::read( $this ) : array_diff_assoc( Collection::read( $this ), $this->persistent );
 
     // perform the create/update
-    $statement = $this->_model->statement()->setField( [ $data ] );
-    if( $exist ) $statement->setFilter( $this->_key )->update();
-    else $this->_key = $statement->create();
+    $this->_model->setField( [ $data ] );
+    if( $exist ) $this->_model->setFilter( $this->_key )->update();
+    else $this->_key = $this->_model->create();
 
     // 
     $this->persistent = Collection::read( $this );
@@ -153,7 +155,7 @@ class Item extends Storage implements ItemInterface {
     if( !isset( $this->_key ) ) throw new \LogicException( "Item's key can't be empty..there is nothing to remove!" );
     else {
 
-      $this->_model->statement( $this->_key )->remove();
+      $this->_model->set( $this->_key )->remove();
       $this->persistent = [];
 
       return $this;
@@ -161,7 +163,7 @@ class Item extends Storage implements ItemInterface {
   }
 
   //
-  public function getKey():?array {
+  public function getKey(): ?array {
     return $this->_key;
   }
   //
@@ -176,7 +178,7 @@ class Item extends Storage implements ItemInterface {
 
   //
   public function isExist(): bool {
-    return !empty( $this->_key ) && $this->_model->statement( $this->_key )->count() > 0;
+    return !empty( $this->_key ) && $this->_model->set( $this->_key )->count() > 0;
   }
 
   //

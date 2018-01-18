@@ -69,9 +69,10 @@ abstract class View extends Structure implements ViewInterface {
   private $_format;
 
   /**
-   * @inheritdoc
+   * @param array|object $input
+   * @param null|string  $format
    *
-   * @param null|string $format
+   * @throws \InvalidArgumentException
    */
   public function __construct( $input, ?string $format = null ) {
     parent::__construct( $input );
@@ -79,7 +80,9 @@ abstract class View extends Structure implements ViewInterface {
     $this->setFormat( $format );
   }
 
-  //
+  /**
+   * @return null|string
+   */
   function __toString() {
     return $this->render();
   }

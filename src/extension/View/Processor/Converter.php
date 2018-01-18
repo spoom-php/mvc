@@ -39,6 +39,7 @@ class Converter implements ProcessorInterface, Helper\AccessableInterface {
    * @param null|Helper\StreamInterface $stream
    *
    * @return null|string
+   * @throws Core\ConverterFailException
    */
   public function __invoke( View $view, ?Helper\StreamInterface $stream = null ) {
 
