@@ -15,15 +15,12 @@ interface DefinitionInterface {
    */
   public function add( string $operator, $value = null, int $slot = 0 );
   /**
-   * Apply definition to the statement
-   */
-  public function apply();
-  /**
-   * Post-process the statement's result
+   * @param array $list
+   * @param array $_list
    *
-   * @param mixed $result
+   * @return array
    */
-  public function finish( &$result );
+  public function __invoke( array $list, array $_list = [] ): array;
 
   /**
    * @param Statement $value
@@ -31,4 +28,43 @@ interface DefinitionInterface {
    * @return static
    */
   public function setStatement( Statement $value );
+
+  /**
+   * @return string
+   */
+  public function getType();
+  /**
+   * @return string
+   */
+  public function getName();
+}
+
+//
+abstract class Definition implements DefinitionInterface {
+
+  /**
+   * @var Statement
+   */
+  protected $_statement;
+  /**
+   * @var array[]
+   */
+  protected $slot_list = [];
+
+  //
+  public function add( string $operator, $value = null, int $slot = 0 ) {
+
+    //
+    if( !array_key_exists( $slot, $this->slot_list ) ) {
+      $this->slot_list[ $slot ] = [];
+    }
+
+    $this->slot_list[ $slot ][ $operator ] = $value;
+  }
+
+  //
+  public function setStatement( Statement $value ) {
+    $this->_statement = $value;
+    return $this;
+  }
 }

@@ -1,6 +1,8 @@
 <?php namespace Spoom\MVC;
 
 use Spoom\Core\Helper\Collection;
+use Spoom\Core\Helper\Number;
+use Spoom\MVC\Model\Definition\Field;
 use Spoom\MVC\Model\DefinitionInterface;
 use Spoom\MVC\Model\ItemInterface;
 
@@ -14,58 +16,48 @@ interface ModelInterface {
   const DEFINITION_FILTER = 'filter';
   const DEFINITION_FIELD  = 'field';
   const DEFINITION_SORT   = 'sort';
-  const DEFINITION_LIMIT  = 'limit';
 
   const METHOD_SEARCH = 'search';
   const METHOD_CREATE = 'create';
   const METHOD_UPDATE = 'update';
   const METHOD_REMOVE = 'remove';
 
-  const OPERATOR_REVERSE = '!';
+  const OPERATOR_DEFAULT = '';
 
-  const OPERATOR_UNKNOWN  = '';
-  const OPERATOR_EQUAL    = '=';
-  const OPERATOR_EQUALNOT = '!=';
-  const OPERATOR_GREATER  = '<';
-  const OPERATOR_LESSER   = '>';
+  /**
+   * It's only for decoration and simple equality checks
+   */
+  const OPERATOR_MODIFIER_EQUAL = '=';
+  /**
+   * Invert the final result of the operator
+   */
+  const OPERATOR_MODIFIER_INVERT = '!';
+  /**
+   * Allow to apply the operator on multiple values
+   */
+  const OPERATOR_MODIFIER_MULTIPLE = '[]';
 
-  const OPERATOR_GREATEREQUAL = '<=';
-  const OPERATOR_LESSEREQUAL  = '>=';
+  const OPERATOR_GREATER = '<';
+  const OPERATOR_LESSER  = '>';
+  const OPERATOR_BEGIN   = '^';
+  const OPERATOR_END     = '$';
+  const OPERATOR_CONTAIN = '*';
+  /**
+   * Natural search in any text
+   */
+  const OPERATOR_SEARCH  = '?';
+  const OPERATOR_PATTERN = '%';
+  const OPERATOR_REGEXP  = '|';
 
-  const OPERATOR_BEGIN      = '^=';
-  const OPERATOR_BEGINNOT   = '^!';
-  const OPERATOR_END        = '$=';
-  const OPERATOR_ENDNOT     = '$!';
-  const OPERATOR_CONTAIN    = '*=';
-  const OPERATOR_CONTAINNOT = '*!';
-  const OPERATOR_SEARCH     = '?=';
-
-  const OPERATOR_PATTERN    = '%=';
-  const OPERATOR_PATTERNNOT = '%!';
-  const OPERATOR_REGEXP     = '|=';
-  const OPERATOR_REGEXPNOT  = '|!';
-
-  const OPERATOR = [
-    'greaterequal' => self::OPERATOR_GREATEREQUAL,
-    'lesserequal'  => self::OPERATOR_LESSEREQUAL,
-    'begin'        => self::OPERATOR_BEGIN,
-    'beginnot'     => self::OPERATOR_BEGINNOT,
-    'end'          => self::OPERATOR_END,
-    'endnot'       => self::OPERATOR_ENDNOT,
-    'contain'      => self::OPERATOR_CONTAIN,
-    'containnot'   => self::OPERATOR_CONTAINNOT,
-    'search'       => self::OPERATOR_SEARCH,
-    'pattern'      => self::OPERATOR_PATTERN,
-    'patternnot'   => self::OPERATOR_PATTERNNOT,
-    'regexp'       => self::OPERATOR_REGEXP,
-    'regexpnot'    => self::OPERATOR_REGEXPNOT,
-
-    'equal'    => self::OPERATOR_EQUAL,
-    'equalnot' => self::OPERATOR_EQUALNOT,
-    'greater'  => self::OPERATOR_GREATER,
-    'lesser'   => self::OPERATOR_LESSER,
-
-    '' => self::OPERATOR_UNKNOWN
+  const OPERATOR_LIST = [
+    'greater' => self::OPERATOR_GREATER,
+    'lesser'  => self::OPERATOR_LESSER,
+    'begin'   => self::OPERATOR_BEGIN,
+    'end'     => self::OPERATOR_END,
+    'contain' => self::OPERATOR_CONTAIN,
+    'search'  => self::OPERATOR_SEARCH,
+    'pattern' => self::OPERATOR_PATTERN,
+    'regexp'  => self::OPERATOR_REGEXP
   ];
 
   /**
@@ -192,9 +184,9 @@ interface ModelInterface {
    *
    * @param string $method
    *
-   * @return Model\Statement
+   * @return Model\StatementInterface
    */
-  public function statement( string $method ): Model\Statement;
+  public function statement( string $method ): Model\StatementInterface;
 
   /**
    * Get a(ll) field(s) from slot(s)
@@ -209,6 +201,8 @@ interface ModelInterface {
    * Set the fields
    *
    * The array will be reindexed from zero
+   *
+   * TODO add ability to set all available field with default values
    *
    * @param array[] $list List of associative arrays of field names (key) and their meta (value). Every list item is a slot
    *
@@ -266,7 +260,7 @@ interface ModelInterface {
    *
    * @return static
    */
-  public function addFilter( string $name, $value, string $operator = self::OPERATOR_EQUAL );
+  public function addFilter( string $name, $value, string $operator = self::OPERATOR_DEFAULT );
   /**
    * Remove filter(s) from the statement
    *
@@ -323,30 +317,30 @@ interface ModelInterface {
   /**
    * Get filter/field/sort or limit definitions
    *
-   * @param string|null $method Definition's type or ===null to all definition
+   * @param string|null $type Definition's type or ===null to all definition
    *
    * @return DefinitionInterface[]|DefinitionInterface[][]
    */
-  public function getDefinitionList( string $method = null ): array;
+  public function getDefinitionList( string $type = null ): array;
   /**
    * Get filter/field/sort or limit definitions
    *
-   * @param string|null $method Definition's type or ===null to all definition
+   * @param string|null $type Definition's type or ===null to all definition
    * @param string      $name
    *
    * @return DefinitionInterface
    * @throws \InvalidArgumentException
    * @throws \LogicException
    */
-  public function getDefinition( string $method, string $name );
+  public function getDefinition( string $type, string $name );
 }
-/**
- * Class Model
- */
+//
 abstract class Model implements ModelInterface {
 
   /**
    * Multiple key definitions in order (first is the primary key)
+   *
+   * TODO create (protected) setter for this
    *
    * @var array[]
    */
@@ -392,14 +386,14 @@ abstract class Model implements ModelInterface {
     $result = $this->invoke( static::METHOD_UPDATE, $limit, $offset );
 
     if( $reset ) $this->set();
-    return $result();
+    return $result;
   }
   //
   public function remove( int $limit = 0, int $offset = 0, bool $reset = true ): int {
     $result = $this->invoke( static::METHOD_REMOVE, $limit, $offset );
 
     if( $reset ) $this->set();
-    return $result();
+    return $result;
   }
   //
   public function search( int $limit = 0, int $offset = 0, bool $reset = true ): array {
@@ -510,17 +504,67 @@ abstract class Model implements ModelInterface {
   /**
    * Apply model to a statement
    *
-   * @param Model\Statement $statement
+   * @param Model\StatementInterface $statement
    *
-   * @return Model\Statement
+   * @return Model\StatementInterface
    * @throws \InvalidArgumentException
    * @throws \LogicException
    */
-  protected function apply( Model\Statement $statement ) {
+  protected function apply( Model\StatementInterface $statement ) {
+    $model = clone $this;
 
-    foreach( $this->getField() as $slot => $field_list ) {
+    /** @var Field[] $field_list */
+    $field_list = $this->getDefinitionList( static::DEFINITION_FIELD );
+    switch( $statement->getMethod() ) {
+      //
+      case static::METHOD_SEARCH:
+
+        // add default fields that is not already in the model
+        foreach( $field_list as $field ) {
+          if( ( $field->getFlag() & Field::FLAG_AUTO ) && !$model->getField( 0, $field->getName() ) ) {
+            // TODO add support for a default value
+            $model->addField( [ $field->getName() => [] ] );
+          }
+        }
+
+        break;
+
+      case static::METHOD_CREATE:
+
+        // add default create values for fields that is flagged as required and not already in the model
+        foreach( $field_list as $field ) {
+          if( $field->getFlag() & Field::FLAG_REQUIRED ) {
+
+            $slot_list = $model->getField();
+            foreach( $slot_list as $slot => $_field_list ) {
+              if( !isset( $_field_list[ $field->getName() ] ) ) {
+                // TODO add support for a default value
+                $model->addField( [ $field->getName() => null ], true, $slot );
+              }
+            }
+          }
+        }
+
+        break;
+
+      case static::METHOD_UPDATE:
+
+        // remove fields that are not updatable
+        foreach( $field_list as $field ) {
+          if( !( $field->getFlag() & Field::FLAG_WRITEABLE ) && $model->getField( 0, $field->getName() ) ) {
+            $model->removeField( [ $field->getName() ] );
+          }
+        }
+
+        break;
+    }
+
+    // add fields from the model into the statement
+    foreach( $model->getField() as $slot => $field_list ) {
       foreach( $field_list as $name => $value ) {
-        $statement->addDefinition( static::DEFINITION_FIELD, $name, $value, $slot );
+        $operator   = null;
+        $definition = $model->getDefinition( static::DEFINITION_FIELD, static::operator( $name, $operator ) );
+        $statement->addDefinition( $definition, $operator, $value, $slot );
       }
     }
 
@@ -530,13 +574,17 @@ abstract class Model implements ModelInterface {
       case static::METHOD_SEARCH:
 
         //
-        foreach( $this->getFilter() as $name => $value ) {
-          $statement->addDefinition( static::DEFINITION_FILTER, $name, $value );
+        foreach( $model->getFilter() as $name => $value ) {
+          $operator   = null;
+          $definition = $model->getDefinition( static::DEFINITION_FILTER, static::operator( $name, $operator ) );
+          $statement->addDefinition( $definition, $operator, $value );
         }
 
         //
-        foreach( $this->getSort() as $name ) {
-          $statement->addDefinition( static::DEFINITION_SORT, $name );
+        foreach( $model->getSort() as $name ) {
+          $operator   = null;
+          $definition = $model->getDefinition( static::DEFINITION_SORT, static::operator( $name, $operator ) );
+          $statement->addDefinition( $definition, $operator, $value );
         }
 
         break;
@@ -596,10 +644,19 @@ abstract class Model implements ModelInterface {
     else {
 
       // check for inner arrays
-      foreach( $list as $fields ) {
-        if( !Collection::is( $fields, true, true ) ) {
+      foreach( $list as $slot => $field_list ) {
+        if( !Collection::is( $field_list, true, true ) ) {
           throw new \InvalidArgumentException( 'List must be a numeric array of iterables' );
         }
+
+        // pre-process field_list to handle simple field definitions
+        $_field_list = [];
+        foreach( $field_list as $key => $value ) {
+          if( Number::is( $key, true ) ) $_field_list[ $value ] = [];
+          else $_field_list[ $key ] = $value;
+        }
+
+        $list[ $slot ] = $_field_list;
       }
 
       // normalize the list to start with zero
@@ -611,8 +668,15 @@ abstract class Model implements ModelInterface {
   //
   public function addField( array $list, bool $merge = true, ?int $slot = 0 ) {
 
+    // pre-process list to handle simple field definitions
+    $_list = [];
+    foreach( $list as $key => $value ) {
+      if( Number::is( $key, true ) ) $_list[ $value ] = [];
+      else $_list[ $key ] = $value;
+    }
+
     $slot                  = $slot === null ? count( $this->_field ) : $slot;
-    $this->_field[ $slot ] = $list + ( $merge ? ( $this->_field[ $slot ] ?? [] ) : [] );
+    $this->_field[ $slot ] = $_list + ( $merge ? ( $this->_field[ $slot ] ?? [] ) : [] );
 
     return $this;
   }
@@ -646,7 +710,7 @@ abstract class Model implements ModelInterface {
     return $this;
   }
   //
-  public function addFilter( string $name, $value, string $operator = self::OPERATOR_EQUAL ) {
+  public function addFilter( string $name, $value, string $operator = self::OPERATOR_MODIFIER_EQUAL ) {
 
     $this->_filter[ static::operator( $name, $operator ) ] = $value;
     return $this;
@@ -688,7 +752,7 @@ abstract class Model implements ModelInterface {
   public function addSort( string $name, bool $reverse = false ) {
 
     // prepend operator and prevent duplicates (keep only the latest one)
-    $operator = $reverse ? self::OPERATOR_REVERSE : '';
+    $operator = $reverse ? self::OPERATOR_MODIFIER_INVERT : '';
     $name     = static::operator( $name, $operator );
     $this->removeSort( [ $name ] );
 
@@ -697,9 +761,14 @@ abstract class Model implements ModelInterface {
   }
   //
   public function removeSort( ?array $list = null ) {
-    foreach( $list as $name ) {
-      if( ( $tmp = array_search( $name, $this->_sort ) ) !== false ) {
-        array_splice( $this->_sort, $tmp, 1 );
+
+    if( $list === null ) $this->_sort = [];
+    else {
+
+      foreach( $list as $name ) {
+        if( ( $tmp = array_search( $name, $this->_sort ) ) !== false ) {
+          array_splice( $this->_sort, $tmp, 1 );
+        }
       }
     }
 
@@ -712,30 +781,41 @@ abstract class Model implements ModelInterface {
   }
 
   //
-  public function getDefinitionList( string $method = null ): array {
-    if( $method === null ) return $this->_definition;
-    else if( !isset( $this->_definition[ $method ] ) ) throw new \InvalidArgumentException( 'Type must be: ' . implode( ', ', array_keys( $this->_definition ) ) );
-    else return $this->_definition[ $method ];
+  public function getDefinitionList( string $type = null ): array {
+    if( $type === null ) return $this->_definition;
+    else if( !isset( $this->_definition[ $type ] ) ) throw new \InvalidArgumentException( 'Type must be: ' . implode( ', ', array_keys( $this->_definition ) ) );
+    else return $this->_definition[ $type ];
   }
   //
-  public function getDefinition( string $method, string $name ) {
+  public function getDefinition( string $type, string $name ) {
 
-    $list = $this->getDefinitionList( $method );
-    if( !isset( $list[ $name ] ) ) throw new \LogicException( "There is no definition for '{$name}' {$method} in " . get_class( $this ) );
+    $list = $this->getDefinitionList( $type );
+    if( !isset( $list[ $name ] ) ) throw new \LogicException( "There is no definition for '{$name}' {$type} in " . get_class( $this ) );
     else return $list[ $name ];
   }
+
   /**
-   * Add a new filter/field or sort definition to the model
+   * Add a new definition to the model
    *
-   * @param string              $name
-   * @param string              $method
    * @param DefinitionInterface $definition
    *
    * @throws \InvalidArgumentException
    */
-  protected function addDefinition( string $name, string $method, DefinitionInterface $definition ) {
-    if( !isset( $this->_definition[ $method ] ) ) throw new \InvalidArgumentException( 'Type must be: ' . implode( ', ', array_keys( $this->_definition ) ) );
-    else $this->_definition[ $method ][ $name ] = $definition;
+  protected function addDefinition( DefinitionInterface $definition ) {
+    if( !isset( $this->_definition[ $definition->getType() ] ) ) throw new \InvalidArgumentException( 'Type must be: ' . implode( ', ', array_keys( $this->_definition ) ) );
+    else $this->_definition[ $definition->getType() ][ $definition->getName() ] = $definition;
+  }
+  /**
+   * Add multiple definition to the model
+   *
+   * @param DefinitionInterface[] $definition_list
+   *
+   * @throws \InvalidArgumentException
+   */
+  protected function addDefinitionList( array $definition_list ) {
+    foreach( $definition_list as $definition ) {
+      $this->addDefinition( $definition );
+    }
   }
 
   /**
@@ -750,7 +830,7 @@ abstract class Model implements ModelInterface {
     if( $operator !== null ) return $operator . $name;
     else {
 
-      $tmp      = preg_replace( '^[^a-z0-9_-]+', '', $name );
+      $tmp      = preg_replace( '/^[^a-z0-9_-]+/i', '', $name );
       $operator = substr( $name, 0, strlen( $name ) - strlen( $tmp ) );
       return $tmp;
     }
