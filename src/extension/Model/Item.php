@@ -15,12 +15,12 @@ interface ItemInterface extends StorageInterface {
    *
    * By default this is just fetch the data from the model, and doesn't change the storage
    *
-   * @param bool $overwrite Change storage data with the loaded ones
+   * @param bool  $overwrite  Change storage data with the loaded ones
+   * @param array $field_list Add more fields to the item
    *
    * @return static
-   * @throws \LogicException Try to fetch without a key
    */
-  public function fetch( bool $overwrite = true );
+  public function fetch( bool $overwrite = false, array $field_list = [] );
   /**
    * Commit changes to the model
    *
@@ -111,11 +111,11 @@ class Item extends Storage implements ItemInterface {
   }
 
   //
-  public function fetch( bool $overwrite = true ) {
+  public function fetch( bool $overwrite = false, array $field_list = [] ) {
     if( !isset( $this->_key ) ) throw new \LogicException( "Item's key can't be empty..there is nothing to fetch!" );
     else {
 
-      $item             = $this->_model->set( $this->_key )->get();
+      $item             = $this->_model->set( $this->_key, $field_list )->get();
       $this->persistent = Collection::read( $item ?? [] );
 
       if( $overwrite ) {

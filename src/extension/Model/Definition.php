@@ -23,11 +23,15 @@ interface DefinitionInterface {
   public function __invoke( array $list, array $_list = [] ): array;
 
   /**
-   * @param Statement $value
+   * @param StatementInterface $value
    *
    * @return static
    */
-  public function setStatement( Statement $value );
+  public function setStatement( StatementInterface $value );
+  /**
+   * @return StatementInterface
+   */
+  public function getStatement(): StatementInterface;
 
   /**
    * @return string
@@ -43,7 +47,7 @@ interface DefinitionInterface {
 abstract class Definition implements DefinitionInterface {
 
   /**
-   * @var Statement
+   * @var StatementInterface
    */
   protected $_statement;
   /**
@@ -63,8 +67,12 @@ abstract class Definition implements DefinitionInterface {
   }
 
   //
-  public function setStatement( Statement $value ) {
+  public function setStatement( StatementInterface $value ) {
     $this->_statement = $value;
     return $this;
+  }
+  //
+  public function getStatement(): StatementInterface {
+    return $this->_statement;
   }
 }

@@ -72,7 +72,7 @@ class Field extends Model\Definition {
 
         $_value                         = $_item[ $this->getName() ] ?? null;
         $formatter                      = $this->_formatter ?? null;
-        $list[ $i ][ $this->getName() ] = $formatter ? $formatter( $_value, $_list, $this->_statement ) : $_value;
+        $list[ $i ][ $this->getName() ] = $formatter ? $formatter( $_value, $_list, $this, isset( $this->slot_list[ $i ] ) ? $i : 0 ) : $_value;
       }
     }
 
