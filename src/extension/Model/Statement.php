@@ -78,12 +78,19 @@ class Statement implements StatementInterface {
   //
   public function __invoke( int $limit, int $offset ) {
 
+    // setup definition for the statment
+    foreach( $this->_definition as $definition_list ) {
+      foreach( $definition_list as $definition ) {
+        $definition->setup( $this );
+      }
+    }
+
     switch( $this->_method ) {
       //
       case ModelInterface::METHOD_SEARCH:
 
         //
-        $list = $this->getSourceList( $limit, $offset );
+        $list = $this->getSourceList( $this->_source, $limit, $offset );
         return $this->getFieldList( $list );
 
       //
@@ -102,7 +109,7 @@ class Statement implements StatementInterface {
         $field = $_list[ 0 ];
 
         //
-        $list = $this->getSourceList( $limit, $offset );
+        $list = $this->getSourceList( $this->_source, $limit, $offset );
 
         $_list = [];
         foreach( $list as $item ) {
@@ -121,7 +128,7 @@ class Statement implements StatementInterface {
       case ModelInterface::METHOD_REMOVE:
 
         //
-        $list = $this->getSourceList( $limit, $offset );
+        $list = $this->getSourceList( $this->_source, $limit, $offset );
 
         $_list = [];
         foreach( $list as $item ) {
@@ -148,33 +155,30 @@ class Statement implements StatementInterface {
     $type = $definition->getType();
     $name = $definition->getName();
     if( !isset( $this->_definition[ $type ][ $name ] ) ) {
-
-      //
-      $tmp                                 = clone $definition;
-      $this->_definition[ $type ][ $name ] = $tmp->setStatement( $this );
+      $this->_definition[ $type ][ $name ] = clone $definition;
     }
 
-    $this->_definition[ $type ][ $name ]->add( $operator, $value, $slot );
+    $this->_definition[ $type ][ $name ]->setOperator( $operator, $value, $slot );
     return $this;
   }
 
   /**
-   * Get source list with applied filter, sort and limits
+   * Get list with applied filter, sort and limits
    *
-   * @param int $limit
-   * @param int $offset
+   * @param array $list
+   * @param int   $limit
+   * @param int   $offset
    *
    * @return array
    */
-  protected function getSourceList( int $limit = 0, int $offset = 0 ): array {
+  protected function getSourceList( array $list, int $limit = 0, int $offset = 0 ): array {
 
-    $list = $this->_source;
     foreach( ( $this->_definition[ ModelInterface::DEFINITION_FILTER ] ?? [] ) as $definition ) {
-      $list = $definition( $list );
+      $list = $definition->execute( $list );
     }
 
     foreach( ( $this->_definition[ ModelInterface::DEFINITION_SORT ] ?? [] ) as $definition ) {
-      $list = $definition( $list );
+      $list = $definition->execute( $list );
     }
 
     return array_slice( $list, $offset, $limit === 0 ? null : $limit );
@@ -195,7 +199,7 @@ class Statement implements StatementInterface {
     $list  = array_slice( $list, $offset, $limit === 0 ? null : $limit );
     $_list = array_combine( array_keys( $list ), array_fill( 0, count( $list ), [] ) );
     foreach( ( $this->_definition[ ModelInterface::DEFINITION_FIELD ] ?? [] ) as $definition ) {
-      $_list = $definition( $_list, $list );
+      $_list = $definition->execute( $_list, $list );
     }
 
     return $_list;

@@ -2,7 +2,7 @@
 
 use Spoom\Core\Helper;
 use Spoom\MVC\View\ProcessorInterface;
-use Spoom\Core\Helper\Structure;
+use Spoom\Core\Helper\Wrapper;
 use Spoom\Core\Helper\Text;
 
 /**
@@ -52,7 +52,7 @@ interface ViewInterface {
 /**
  * Class View
  */
-abstract class View extends Structure implements ViewInterface {
+abstract class View extends Wrapper implements ViewInterface {
 
   /**
    * Available format names. Only these formats can be rendered from the view

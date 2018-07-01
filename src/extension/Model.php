@@ -27,15 +27,15 @@ interface ModelInterface {
   /**
    * It's only for decoration and simple equality checks
    */
-  const OPERATOR_MODIFIER_EQUAL = '=';
+  const OPERATOR_EQUAL = '=';
   /**
    * Invert the final result of the operator
    */
-  const OPERATOR_MODIFIER_INVERT = '!';
+  const OPERATOR_INVERT = '!';
   /**
    * Allow to apply the operator on multiple values
    */
-  const OPERATOR_MODIFIER_MULTIPLE = '[]';
+  const OPERATOR_MULTIPLE = '[]';
 
   const OPERATOR_GREATER = '<';
   const OPERATOR_LESSER  = '>';
@@ -45,8 +45,8 @@ interface ModelInterface {
   /**
    * Natural search in any text
    */
-  const OPERATOR_SEARCH  = '?';
-  const OPERATOR_PATTERN = '%';
+  const OPERATOR_SEARCH  = '%';
+  const OPERATOR_PATTERN = '?';
   const OPERATOR_REGEXP  = '|';
 
   const OPERATOR_LIST = [
@@ -513,7 +513,6 @@ abstract class Model implements ModelInterface {
   protected function apply( Model\StatementInterface $statement ) {
     $model = clone $this;
 
-    /** @var Field[] $field_list */
     $field_list = $this->getDefinitionList( static::DEFINITION_FIELD );
     switch( $statement->getMethod() ) {
       //
@@ -584,7 +583,7 @@ abstract class Model implements ModelInterface {
         foreach( $model->getSort() as $name ) {
           $operator   = null;
           $definition = $model->getDefinition( static::DEFINITION_SORT, static::operator( $name, $operator ) );
-          $statement->addDefinition( $definition, $operator, $value );
+          $statement->addDefinition( $definition, $operator, null );
         }
 
         break;
@@ -640,7 +639,7 @@ abstract class Model implements ModelInterface {
   public function setField( array $list ) {
 
     // check for numerical outer array
-    if( !Collection::isArrayNumeric( $list ) ) throw new \InvalidArgumentException( 'List must be a numeric array' );
+    if( !Collection::isNumeric( $list ) ) throw new \InvalidArgumentException( 'List must be a numeric array' );
     else {
 
       // check for inner arrays
@@ -710,7 +709,7 @@ abstract class Model implements ModelInterface {
     return $this;
   }
   //
-  public function addFilter( string $name, $value, string $operator = self::OPERATOR_MODIFIER_EQUAL ) {
+  public function addFilter( string $name, $value, string $operator = self::OPERATOR_EQUAL ) {
 
     $this->_filter[ static::operator( $name, $operator ) ] = $value;
     return $this;
@@ -752,7 +751,7 @@ abstract class Model implements ModelInterface {
   public function addSort( string $name, bool $reverse = false ) {
 
     // prepend operator and prevent duplicates (keep only the latest one)
-    $operator = $reverse ? self::OPERATOR_MODIFIER_INVERT : '';
+    $operator = $reverse ? self::OPERATOR_INVERT : '';
     $name     = static::operator( $name, $operator );
     $this->removeSort( [ $name ] );
 
