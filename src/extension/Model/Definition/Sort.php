@@ -2,24 +2,16 @@
 
 use Spoom\Core\Helper\Number;
 use Spoom\MVC\Model;
-use Spoom\MVC\ModelInterface;
 
 //
 class Sort extends Model\Definition {
 
   /**
-   * @var string
-   */
-  private $_operator;
-
-  /**
    * @param string $name     Field name that is being sorted
    * @param string $operator Default operator
    */
-  public function __construct( string $name, string $operator = Model::OPERATOR_DEFAULT ) {
-    parent::__construct( $name );
-
-    $this->_operator = $operator;
+  public function __construct( string $name, string $operator = Model\Operator::DEFAULT ) {
+    parent::__construct( $name, $operator, [ Model\Operator::DEFAULT, Model\Operator::FLAG_NOT ] );
   }
 
   //
@@ -27,8 +19,8 @@ class Sort extends Model\Definition {
 
     foreach( ( $this->slot_list[ 0 ] ?? [] ) as $operator => $value ) {
 
-      $_operator = $operator === ModelInterface::OPERATOR_DEFAULT ? $this->_operator : $operator;
-      usort( $list, $_operator === ModelInterface::OPERATOR_INVERT ? function ( $item, $_item ) {
+      $_operator = $this->operator( $operator );
+      usort( $list, $_operator->isNot() ? function ( $item, $_item ) {
         $test  = $item[ $this->getName() ] ?? null;
         $_test = $_item[ $this->getName() ] ?? null;
 
@@ -46,6 +38,6 @@ class Sort extends Model\Definition {
 
   //
   public function getType() {
-    return Model::DEFINITION_SORT;
+    return Model\Definition::SORT;
   }
 }

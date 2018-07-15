@@ -132,7 +132,9 @@ class FormatterNumber extends Formatter {
         else if( $this->maximum !== null && $this->maximum < $input ) throw new FormatterExceptionLength( $field, null, $this->maximum );
       }
 
+      // FIXME change this after `Helper\Number::read` supports precision
       $input = round( Helper\Number::read( $input, 0 ), $this->precision );
+      if( $this->precision === 0 ) $input = intval( $input );
     }
 
     return parent::__invoke( $input, $list, $field, $slot );

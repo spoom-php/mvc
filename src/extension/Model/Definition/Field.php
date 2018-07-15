@@ -44,7 +44,7 @@ class Field extends Model\Definition {
    * @param int           $flag
    */
   public function __construct( string $name, ?callable $formatter = null, int $flag = self::FLAG_AW ) {
-    parent::__construct( $name, $flag );
+    parent::__construct( $name, null, [], $flag );
 
     $this->_formatter = $formatter;
   }
@@ -66,7 +66,7 @@ class Field extends Model\Definition {
 
   //
   public function getType() {
-    return Model::DEFINITION_FIELD;
+    return Model\Definition::FIELD;
   }
 }
 
@@ -149,7 +149,7 @@ class FieldForeign extends Field {
         $tmp             = $this->_model->set( $search[ 0 ] + [ $this->_foreign_key => array_unique( $keys ) ], $search[ 1 ], $search[ 2 ] )->search();
         foreach( $tmp as $t ) {
 
-          $key_list = $t[ Model::operator( $this->_foreign_key ) ];
+          $key_list = $t[ Model::definition( $this->_foreign_key ) ];
           foreach( Collection::read( $key_list, [ $key_list ] ) as $key ) {
             if( $this->_multiple === null ) $connection_list[ $key ] = isset( $connection_list[ $key ] ) ? $connection_list[ $key ] : $t;
             else {

@@ -1,31 +1,20 @@
 <?php namespace Spoom\MVC\Model\Definition;
 
 use Spoom\MVC\Model;
-use Spoom\MVC\ModelInterface;
 use Spoom\Core\Helper\Collection;
 
 //
 abstract class Filter extends Model\Definition {
 
   /**
-   * @var string
-   */
-  private $_operator;
-  /**
-   * @var string[]|null
-   */
-  private $_operator_list;
-
-  /**
    * @param string     $name          Name of the filter
    * @param string     $operator      Default operator
    * @param array|null $operator_list Supported operators
+   *
+   * @throws \InvalidArgumentException Not available default operator
    */
-  public function __construct( string $name, string $operator = Model::OPERATOR_EQUAL, ?array $operator_list = null ) {
-    parent::__construct( $name );
-
-    $this->_operator      = $operator;
-    $this->_operator_list = $operator_list;
+  public function __construct( string $name, string $operator = Model\Operator::DEFAULT, ?array $operator_list = null ) {
+    parent::__construct( $name, $operator, $operator_list );
   }
 
   /**
@@ -38,59 +27,57 @@ abstract class Filter extends Model\Definition {
    * @return bool
    */
   protected function match( $input, $operator, $test ) {
-    $_operator = $operator === ModelInterface::OPERATOR_DEFAULT ? $this->_operator : $operator;
-
-    $equal     = strpos( $_operator, ModelInterface::OPERATOR_EQUAL ) !== false;
-    $invert    = strpos( $_operator, ModelInterface::OPERATOR_INVERT ) !== false;
-    $multiple  = strpos( $_operator, ModelInterface::OPERATOR_MULTIPLE ) !== false;
-    $_operator = str_replace( [ ModelInterface::OPERATOR_EQUAL, ModelInterface::OPERATOR_INVERT, ModelInterface::OPERATOR_MULTIPLE ], '', $_operator );
+    $_operator = $this->operator( $operator );
 
     $result    = false;
-    $test_list = !$multiple || !Collection::isNumeric( $test ) ? [ $test ] : $test;
-    switch( $_operator ) {
-      case '':
+    $test_list = !$_operator->isAny() || !Collection::isNumeric( $test ) ? [ $test ] : $test;
+    switch( $_operator->getType() ) {
+      case Model\Operator::DEFAULT:
         foreach( $test_list as $_value ) {
-          $result = $result || $input == $_value;
+          $result = $result || ( $_operator->isLoose() ? $input == $_value : $input === $_value );
         }
         break;
 
       //
-      case ModelInterface::OPERATOR_GREATER:
+      case Model\Operator::GREATER:
         foreach( $test_list as $_value ) {
-          $result = $result || ( ( $equal && $input >= $_value ) || ( !$equal && $input > $_value ) );
+          $result = $result || ( ( $_operator->isLoose() && $input >= $_value ) || ( !$_operator->isLoose() && $input > $_value ) );
         }
         break;
 
       //
-      case ModelInterface::OPERATOR_LESSER:
+      case Model\Operator::LESSER:
         foreach( $test_list as $_value ) {
-          $result = $result || ( ( $equal && $input <= $_value ) || ( !$equal && $input < $_value ) );
+          $result = $result || ( ( $_operator->isLoose() && $input <= $_value ) || ( !$_operator->isLoose() && $input < $_value ) );
         }
         break;
 
       //
-      case ModelInterface::OPERATOR_CONTAIN:
+      case Model\Operator::CONTAIN:
+        $method = $_operator->isLoose() ? 'stripos' : 'strpos';
         foreach( $test_list as $_value ) {
-          $result = $result || stripos( $input, $_value ) !== false;
+          $result = $result || $method( $input, $_value ) !== false;
         }
         break;
 
       //
-      case ModelInterface::OPERATOR_BEGIN:
+      case Model\Operator::BEGIN:
+        $method = $_operator->isLoose() ? 'stripos' : 'strpos';
         foreach( $test_list as $_value ) {
-          $result = $result || stripos( $input, $_value ) === 0;
+          $result = $result || $method( $input, $_value ) === 0;
         }
         break;
 
       //
-      case ModelInterface::OPERATOR_END:
+      case Model\Operator::END:
+        $method = $_operator->isLoose() ? 'stripos' : 'strpos';
         foreach( $test_list as $_value ) {
-          $result = $result || stripos( $input, $_value ) === strlen( $input ) - strlen( $_value );
+          $result = $result || $method( $input, $_value ) === strlen( $input ) - strlen( $_value );
         }
         break;
 
       //
-      case ModelInterface::OPERATOR_REGEXP:
+      case Model\Operator::REGEXP:
         foreach( $test_list as $_value ) {
           $result = $result || preg_match( $input, $_value ) !== false;
         }
@@ -99,12 +86,12 @@ abstract class Filter extends Model\Definition {
       // TODO implement every operator
     }
 
-    return $invert ? !$result : $result;
+    return $_operator->isNot() ? !$result : $result;
   }
 
   //
   public function getType() {
-    return Model::DEFINITION_FILTER;
+    return static::FILTER;
   }
 }
 //
@@ -123,7 +110,7 @@ class FilterCustom extends Filter {
    * @param string     $operator      Default operator
    * @param array|null $operator_list Supported operators
    */
-  public function __construct( string $name, callable $callback, string $operator = Model::OPERATOR_EQUAL, $operator_list = null ) {
+  public function __construct( string $name, callable $callback, string $operator = Model\Operator::DEFAULT, ?array $operator_list = null ) {
     parent::__construct( $name, $operator, $operator_list );
 
     $this->callback = $callback;
@@ -164,7 +151,7 @@ class FilterField extends Filter {
    * @param string      $operator      Default operator
    * @param array|null  $operator_list Supported operators
    */
-  public function __construct( string $name, ?string $field = null, string $operator = Model::OPERATOR_EQUAL, $operator_list = null ) {
+  public function __construct( string $name, ?string $field = null, string $operator = Model\Operator::DEFAULT, ?array $operator_list = null ) {
     parent::__construct( $name, $operator, $operator_list );
 
     $this->_field = $field;

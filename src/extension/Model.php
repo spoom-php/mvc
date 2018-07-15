@@ -7,58 +7,14 @@ use Spoom\MVC\Model\DefinitionInterface;
 use Spoom\MVC\Model\ItemInterface;
 
 /**
- * Interface ModelInterface
- *
  * TODO model should support aggregations
  */
 interface ModelInterface {
-
-  const DEFINITION_FILTER = 'filter';
-  const DEFINITION_FIELD  = 'field';
-  const DEFINITION_SORT   = 'sort';
 
   const METHOD_SEARCH = 'search';
   const METHOD_CREATE = 'create';
   const METHOD_UPDATE = 'update';
   const METHOD_REMOVE = 'remove';
-
-  const OPERATOR_DEFAULT = '';
-
-  /**
-   * It's only for decoration and simple equality checks
-   */
-  const OPERATOR_EQUAL = '=';
-  /**
-   * Invert the final result of the operator
-   */
-  const OPERATOR_INVERT = '!';
-  /**
-   * Allow to apply the operator on multiple values
-   */
-  const OPERATOR_MULTIPLE = '[]';
-
-  const OPERATOR_GREATER = '<';
-  const OPERATOR_LESSER  = '>';
-  const OPERATOR_BEGIN   = '^';
-  const OPERATOR_END     = '$';
-  const OPERATOR_CONTAIN = '*';
-  /**
-   * Natural search in any text
-   */
-  const OPERATOR_SEARCH  = '%';
-  const OPERATOR_PATTERN = '?';
-  const OPERATOR_REGEXP  = '|';
-
-  const OPERATOR_LIST = [
-    'greater' => self::OPERATOR_GREATER,
-    'lesser'  => self::OPERATOR_LESSER,
-    'begin'   => self::OPERATOR_BEGIN,
-    'end'     => self::OPERATOR_END,
-    'contain' => self::OPERATOR_CONTAIN,
-    'search'  => self::OPERATOR_SEARCH,
-    'pattern' => self::OPERATOR_PATTERN,
-    'regexp'  => self::OPERATOR_REGEXP
-  ];
 
   /**
    * Create item(s)
@@ -260,7 +216,7 @@ interface ModelInterface {
    *
    * @return static
    */
-  public function addFilter( string $name, $value, string $operator = self::OPERATOR_DEFAULT );
+  public function addFilter( string $name, $value, string $operator = Model\Operator::DEFAULT );
   /**
    * Remove filter(s) from the statement
    *
@@ -350,9 +306,9 @@ abstract class Model implements ModelInterface {
    * @var DefinitionInterface[][]
    */
   protected $_definition = [
-    self::DEFINITION_FIELD  => [],
-    self::DEFINITION_FILTER => [],
-    self::DEFINITION_SORT   => []
+    Model\Definition::FIELD  => [],
+    Model\Definition::FILTER => [],
+    Model\Definition::SORT   => []
   ];
 
   /**
@@ -513,7 +469,7 @@ abstract class Model implements ModelInterface {
   protected function apply( Model\StatementInterface $statement ) {
     $model = clone $this;
 
-    $field_list = $this->getDefinitionList( static::DEFINITION_FIELD );
+    $field_list = $this->getDefinitionList( Model\Definition::FIELD );
     switch( $statement->getMethod() ) {
       //
       case static::METHOD_SEARCH:
@@ -562,7 +518,7 @@ abstract class Model implements ModelInterface {
     foreach( $model->getField() as $slot => $field_list ) {
       foreach( $field_list as $name => $value ) {
         $operator   = null;
-        $definition = $model->getDefinition( static::DEFINITION_FIELD, static::operator( $name, $operator ) );
+        $definition = $model->getDefinition( Model\Definition::FIELD, static::definition( $name, $operator ) );
         $statement->addDefinition( $definition, $operator, $value, $slot );
       }
     }
@@ -575,14 +531,14 @@ abstract class Model implements ModelInterface {
         //
         foreach( $model->getFilter() as $name => $value ) {
           $operator   = null;
-          $definition = $model->getDefinition( static::DEFINITION_FILTER, static::operator( $name, $operator ) );
+          $definition = $model->getDefinition( Model\Definition::FILTER, static::definition( $name, $operator ) );
           $statement->addDefinition( $definition, $operator, $value );
         }
 
         //
         foreach( $model->getSort() as $name ) {
           $operator   = null;
-          $definition = $model->getDefinition( static::DEFINITION_SORT, static::operator( $name, $operator ) );
+          $definition = $model->getDefinition( Model\Definition::SORT, static::definition( $name, $operator ) );
           $statement->addDefinition( $definition, $operator, null );
         }
 
@@ -709,9 +665,9 @@ abstract class Model implements ModelInterface {
     return $this;
   }
   //
-  public function addFilter( string $name, $value, string $operator = self::OPERATOR_EQUAL ) {
+  public function addFilter( string $name, $value, string $operator = Model\Operator::DEFAULT ) {
 
-    $this->_filter[ static::operator( $name, $operator ) ] = $value;
+    $this->_filter[ static::definition( $name, $operator ) ] = $value;
     return $this;
   }
   //
@@ -751,8 +707,8 @@ abstract class Model implements ModelInterface {
   public function addSort( string $name, bool $reverse = false ) {
 
     // prepend operator and prevent duplicates (keep only the latest one)
-    $operator = $reverse ? self::OPERATOR_INVERT : '';
-    $name     = static::operator( $name, $operator );
+    $operator = $reverse ? Model\Operator::FLAG_NOT : Model\Operator::DEFAULT;
+    $name     = static::definition( $name, $operator );
     $this->removeSort( [ $name ] );
 
     $this->_sort[] = $name;
@@ -818,19 +774,19 @@ abstract class Model implements ModelInterface {
   }
 
   /**
-   * Extract or inject operator
+   * Separate or join definion name and operator
    *
    * @param string      $name
    * @param string|null $operator NULL for extract
    *
    * @return string The name with or without the operator
    */
-  public static function operator( $name, &$operator = null ) {
-    if( $operator !== null ) return $operator . $name;
+  public static function definition( $name, &$operator = null ) {
+    if( $operator !== null ) return $name . $operator;
     else {
 
-      $tmp      = preg_replace( '/^[^a-z0-9_-]+/i', '', $name );
-      $operator = substr( $name, 0, strlen( $name ) - strlen( $tmp ) );
+      $tmp      = preg_replace( '/[^a-z0-9_-]+$/i', '', $name );
+      $operator = substr( $name, strlen( $tmp ) );
       return $tmp;
     }
   }

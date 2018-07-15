@@ -58,9 +58,9 @@ class Statement implements StatementInterface {
    * @var DefinitionInterface[][]
    */
   private $_definition = [
-    Model::DEFINITION_FIELD  => [],
-    Model::DEFINITION_FILTER => [],
-    Model::DEFINITION_SORT   => []
+    Model\Definition::FIELD  => [],
+    Model\Definition::FILTER => [],
+    Model\Definition::SORT   => []
   ];
 
   /**
@@ -173,11 +173,11 @@ class Statement implements StatementInterface {
    */
   protected function getSourceList( array $list, int $limit = 0, int $offset = 0 ): array {
 
-    foreach( ( $this->_definition[ ModelInterface::DEFINITION_FILTER ] ?? [] ) as $definition ) {
+    foreach( ( $this->_definition[ Model\Definition::FILTER ] ?? [] ) as $definition ) {
       $list = $definition->execute( $list );
     }
 
-    foreach( ( $this->_definition[ ModelInterface::DEFINITION_SORT ] ?? [] ) as $definition ) {
+    foreach( ( $this->_definition[ Model\Definition::SORT ] ?? [] ) as $definition ) {
       $list = $definition->execute( $list );
     }
 
@@ -198,7 +198,7 @@ class Statement implements StatementInterface {
 
     $list  = array_slice( $list, $offset, $limit === 0 ? null : $limit );
     $_list = array_combine( array_keys( $list ), array_fill( 0, count( $list ), [] ) );
-    foreach( ( $this->_definition[ ModelInterface::DEFINITION_FIELD ] ?? [] ) as $definition ) {
+    foreach( ( $this->_definition[ Model\Definition::FIELD ] ?? [] ) as $definition ) {
       $_list = $definition->execute( $_list, $list );
     }
 
