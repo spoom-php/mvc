@@ -2,6 +2,7 @@
 
 use Spoom\Core\Helper\Collection;
 use Spoom\Core\Helper\Number;
+use Spoom\MVC\Model\Definition;
 use Spoom\MVC\Model\Definition\Field;
 use Spoom\MVC\Model\DefinitionInterface;
 use Spoom\MVC\Model\ItemInterface;
@@ -15,6 +16,8 @@ interface ModelInterface {
   const METHOD_CREATE = 'create';
   const METHOD_UPDATE = 'update';
   const METHOD_REMOVE = 'remove';
+
+  const FIELD_ALL = [ '*' ];
 
   /**
    * Create item(s)
@@ -158,8 +161,6 @@ interface ModelInterface {
    *
    * The array will be reindexed from zero
    *
-   * TODO add ability to set all available field with default values
-   *
    * @param array[] $list List of associative arrays of field names (key) and their meta (value). Every list item is a slot
    *
    * @return static
@@ -296,11 +297,9 @@ abstract class Model implements ModelInterface {
   /**
    * Multiple key definitions in order (first is the primary key)
    *
-   * TODO create (protected) setter for this
-   *
    * @var array[]
    */
-  protected $_key;
+  private $_key = [];
 
   /**
    * @var DefinitionInterface[][]
@@ -478,7 +477,7 @@ abstract class Model implements ModelInterface {
         foreach( $field_list as $field ) {
           if( ( $field->getFlag() & Field::FLAG_AUTO ) && !$model->getField( 0, $field->getName() ) ) {
             // TODO add support for a default value
-            $model->addField( [ $field->getName() => [] ] );
+            $model->addField( [ $field->getName() => null ] );
           }
         }
 
@@ -599,23 +598,10 @@ abstract class Model implements ModelInterface {
     else {
 
       // check for inner arrays
-      foreach( $list as $slot => $field_list ) {
-        if( !Collection::is( $field_list, true, true ) ) {
-          throw new \InvalidArgumentException( 'List must be a numeric array of iterables' );
-        }
-
-        // pre-process field_list to handle simple field definitions
-        $_field_list = [];
-        foreach( $field_list as $key => $value ) {
-          if( Number::is( $key, true ) ) $_field_list[ $value ] = [];
-          else $_field_list[ $key ] = $value;
-        }
-
-        $list[ $slot ] = $_field_list;
+      $slot = 0;
+      foreach( $list as $field_list ) {
+        $this->addField( $field_list, false, $slot++ );
       }
-
-      // normalize the list to start with zero
-      $this->_field = array_values( $list );
     }
 
     return $this;
@@ -623,10 +609,20 @@ abstract class Model implements ModelInterface {
   //
   public function addField( array $list, bool $merge = true, ?int $slot = 0 ) {
 
+    // handle adding of all fields
+    if( $list === static::FIELD_ALL ) {
+
+      $list = [];
+      foreach( $this->getDefinitionList( DefinitionInterface::FIELD ) as $field ) {
+        /** @var Definition\Field $field */
+        $list[ $field->getName() ] = null;
+      }
+    }
+
     // pre-process list to handle simple field definitions
     $_list = [];
     foreach( $list as $key => $value ) {
-      if( Number::is( $key, true ) ) $_list[ $value ] = [];
+      if( Number::is( $key, true ) ) $_list[ $value ] = null;
       else $_list[ $key ] = $value;
     }
 
@@ -733,6 +729,29 @@ abstract class Model implements ModelInterface {
   //
   public function getKey( $primary = false ): array {
     return $primary ? $this->_key[ 0 ] : $this->_key;
+  }
+  /**
+   * Set the keys for the model
+   *
+   * The first key is the primary. Every key value must have a filter definition
+   *
+   * @param array[] $list
+   *
+   * @return $this
+   * @throws \LogicException
+   */
+  protected function setKey( array $list ) {
+
+    foreach( $list as $key_list ) {
+      foreach( $key_list as $key ) {
+
+        // this will throw an exception if the filter is not available
+        $this->getDefinition( DefinitionInterface::FILTER, $key );
+      }
+    }
+
+    $this->_key = $list;
+    return $this;
   }
 
   //

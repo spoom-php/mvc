@@ -41,3 +41,59 @@ class Sort extends Model\Definition {
     return Model\Definition::SORT;
   }
 }
+//
+class SortRandom extends Model\Definition {
+
+  /**
+   * @var int|null
+   */
+  private $_seed;
+
+  /**
+   * @param string   $name Field name that is being sorted
+   * @param int|null $seed Optional seed for the random sorting
+   *
+   * @throws \InvalidArgumentException
+   */
+  public function __construct( string $name, ?int $seed = null ) {
+    parent::__construct( $name, null, [] );
+
+    $this->_seed = $seed;
+  }
+
+  //
+  public function execute( array $list, array $_list = [] ): array {
+
+    if( $this->_seed === null ) shuffle( $list );
+    else {
+
+      mt_srand( $this->_seed );
+      $order = array_map( function () { return mt_rand(); }, range( 1, count( $list ) ) );
+      array_multisort( $order, $list );
+      mt_srand();
+    }
+
+    return $list;
+  }
+
+  /**
+   * @return int|null
+   */
+  public function getSeed() {
+    return $this->_seed;
+  }
+  /**
+   * @param int|null $value
+   *
+   * @return $this
+   */
+  public function setSeed( int $value = null ) {
+    $this->_seed = $value;
+    return $this;
+  }
+
+  //
+  public function getType() {
+    return Model\Definition::SORT;
+  }
+}

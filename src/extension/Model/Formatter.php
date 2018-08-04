@@ -178,7 +178,7 @@ class FormatterString extends Formatter {
       $input = Helper\Text::read( $input );
 
       if( $this->isWrite( $field ) ) {
-        $length = mb_strlen( $input );
+        $length = function_exists( 'mb_strlen' ) ? mb_strlen( $input ) : strlen( $input );
         if( $this->minimum !== null && $this->maximum !== null && ( $this->minimum > $length || $this->maximum < $length ) ) throw new FormatterExceptionLength( $field, $this->minimum, $this->maximum );
         else if( $this->minimum !== null && $this->minimum > $length ) throw new FormatterExceptionLength( $field, $this->minimum );
         else if( $this->maximum !== null && $this->maximum < $length ) throw new FormatterExceptionLength( $field, null, $this->maximum );

@@ -1,6 +1,6 @@
 {
   "name": "spoom-php/mvc",
-  "description": "MVC for Spoom Framework",
+  "description": "MVC support for Spoom Framework",
   "keywords": [ "spoom", "mvc" ],
   "type": "spoom-extension",
   "license": "MIT",

@@ -37,16 +37,24 @@ class Field extends Model\Definition {
    * @var callable|null
    */
   private $_formatter;
+  /**
+   * @var mixed
+   */
+  protected $default;
 
   /**
    * @param string        $name
    * @param callable|null $formatter
    * @param int           $flag
+   * @param mixed         $default
+   *
+   * @throws \InvalidArgumentException
    */
-  public function __construct( string $name, ?callable $formatter = null, int $flag = self::FLAG_AW ) {
+  public function __construct( string $name, ?callable $formatter = null, int $flag = self::FLAG_AW, $default = null ) {
     parent::__construct( $name, null, [], $flag );
 
     $this->_formatter = $formatter;
+    $this->default    = $default;
   }
 
   //
@@ -104,11 +112,14 @@ class FieldForeign extends Field {
    * @param string         $key         Item's property to use as a filter value
    * @param string         $foreign_key Foreign model's filter
    * @param string|null    $multiple    empty string for simple list or the map property name
+   * @param array          $default
    * @param array[]        $search
    * @param int            $flag
+   *
+   * @throws \InvalidArgumentException
    */
-  public function __construct( string $name, ModelInterface $model, string $key, string $foreign_key, ?string $multiple = null, array $search = [], int $flag = self::FLAG_NONE ) {
-    parent::__construct( $name, null, $flag );
+  public function __construct( string $name, ModelInterface $model, string $key, string $foreign_key, ?string $multiple = null, array $default = [], array $search = [], int $flag = self::FLAG_NONE ) {
+    parent::__construct( $name, null, $flag, $default );
 
     $this->_model = $model;
 
@@ -116,9 +127,8 @@ class FieldForeign extends Field {
     $this->_foreign_key = $foreign_key;
     $this->_multiple    = $multiple;
 
-    $this->_search = $this->_search + [ [], [], [] ];
+    $this->_search = $search + [ [], [], [] ];
   }
-
   //
   public function __clone() {
     parent::__clone();
@@ -141,6 +151,7 @@ class FieldForeign extends Field {
     foreach( $this->slot_list as $slot => $operator_list ) {
       foreach( $operator_list as $operator => $value ) {
 
+        $value = $value !== null ? $value : $this->default;
         if( Collection::is( $value ) ) {
           $search = Collection::merge( $search, $value );
         }
