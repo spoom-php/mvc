@@ -8,30 +8,21 @@ use Spoom\MVC\ModelInterface;
 class Field extends Model\Definition {
 
   /**
-   * Auto included field for search
+   * Default is to include field automatically in every search and editable
    */
-  const FLAG_AUTO = 1;
+  const FLAG_NONE = 0;
   /**
-   * Required field for create
+   * Field must be manually included in searches
    */
-  const FLAG_REQUIRED = 2;
+  const FLAG_MANUAL = 1;
   /**
-   * Enable to update the field on update operations
+   * Disable modification of the field
    */
-  const FLAG_WRITEABLE = 4;
-
+  const FLAG_STATIC = 2;
   /**
-   * Editable on update, optional on create
+   * Required field for creating an item
    */
-  const FLAG_AW = self::FLAG_AUTO | self::FLAG_WRITEABLE;
-  /**
-   * Required to create, but after it's read-only
-   */
-  const FLAG_AR = self::FLAG_AUTO | self::FLAG_REQUIRED;
-  /**
-   * Required to create, but it's editable on update too
-   */
-  const FLAG_ARW = self::FLAG_AUTO | self::FLAG_WRITEABLE | self::FLAG_REQUIRED;
+  const FLAG_REQUIRED = 4;
 
   /**
    * @var callable|null
@@ -50,7 +41,7 @@ class Field extends Model\Definition {
    *
    * @throws \InvalidArgumentException
    */
-  public function __construct( string $name, ?callable $formatter = null, int $flag = self::FLAG_AW, $default = null ) {
+  public function __construct( string $name, ?callable $formatter = null, int $flag = self::FLAG_NONE, $default = null ) {
     parent::__construct( $name, null, [], $flag );
 
     $this->_formatter = $formatter;

@@ -475,7 +475,7 @@ abstract class Model implements ModelInterface {
 
         // add default fields that is not already in the model
         foreach( $field_list as $field ) {
-          if( ( $field->getFlag() & Field::FLAG_AUTO ) && !$model->getField( 0, $field->getName() ) ) {
+          if( !( $field->getFlag() & Field::FLAG_MANUAL ) && !$model->getField( 0, $field->getName() ) ) {
             // TODO add support for a default value
             $model->addField( [ $field->getName() => null ] );
           }
@@ -505,7 +505,7 @@ abstract class Model implements ModelInterface {
 
         // remove fields that are not updatable
         foreach( $field_list as $field ) {
-          if( !( $field->getFlag() & Field::FLAG_WRITEABLE ) && $model->getField( 0, $field->getName() ) ) {
+          if( ( $field->getFlag() & Field::FLAG_STATIC ) && $model->getField( 0, $field->getName() ) ) {
             $model->removeField( [ $field->getName() ] );
           }
         }
