@@ -2,7 +2,6 @@
 
 use Spoom\Core\Helper\Collection;
 use Spoom\Core\Helper\Number;
-use Spoom\MVC\Model\Definition;
 use Spoom\MVC\Model\Definition\Field;
 use Spoom\MVC\Model\DefinitionInterface;
 use Spoom\MVC\Model\ItemInterface;
@@ -40,9 +39,9 @@ interface ModelInterface {
    * @param int  $offset
    * @param bool $reset Reset the internal state, after the command
    *
-   * @return int The number of the affected rows
+   * @return array
    */
-  public function remove( int $limit = 0, int $offset = 0, bool $reset = true ): int;
+  public function remove( int $limit = 0, int $offset = 0, bool $reset = true ): array;
   /**
    * Update item(s)
    *
@@ -52,9 +51,9 @@ interface ModelInterface {
    * @param int  $offset
    * @param bool $reset Reset the internal state, after the command
    *
-   * @return int The number of the affected rows
+   * @return array
    */
-  public function update( int $limit = 0, int $offset = 0, bool $reset = true ): int;
+  public function update( int $limit = 0, int $offset = 0, bool $reset = true ): array;
   /**
    * Load an array of items
    *
@@ -67,6 +66,28 @@ interface ModelInterface {
    * @return array
    */
   public function search( int $limit = 0, int $offset = 0, bool $reset = true ): array;
+
+  /**
+   * Read only one field's value from an item
+   *
+   * @param string $name The field name to get
+   * @param int    $offset
+   * @param bool   $reset
+   *
+   * @return mixed
+   */
+  public function field( string $name, int $offset = 0, bool $reset = true );
+  /**
+   * Get a list of field values from a list of items
+   *
+   * @param string $name The field name to get
+   * @param int    $limit
+   * @param int    $offset
+   * @param bool   $reset
+   *
+   * @return array
+   */
+  public function fieldList( string $name, int $limit = 0, int $offset = 0, bool $reset = true ): array;
 
   /**
    * Create or update large number of items with different data
@@ -184,7 +205,7 @@ interface ModelInterface {
    *
    * @return static
    */
-  public function removeField( ?array $list = null, ?int $slot = 0 );
+  public function removeField( ?array $list = null, ?int $slot = null );
 
   /**
    * Get filters
@@ -255,7 +276,7 @@ interface ModelInterface {
   /**
    * Remove (all) sort
    *
-   * @param string[] $list
+   * @param string[]|null $list
    *
    * @return static
    */
@@ -282,8 +303,8 @@ interface ModelInterface {
   /**
    * Get filter/field/sort or limit definitions
    *
-   * @param string|null $type Definition's type or ===null to all definition
-   * @param string      $name
+   * @param string $type
+   * @param string $name
    *
    * @return DefinitionInterface
    * @throws \InvalidArgumentException
@@ -293,6 +314,7 @@ interface ModelInterface {
 }
 //
 abstract class Model implements ModelInterface {
+  // FIXME there should be a __clone implementation to prevent linked data problems, but be careful with the performance impact
 
   /**
    * Multiple key definitions in order (first is the primary key)
@@ -337,14 +359,14 @@ abstract class Model implements ModelInterface {
     return $result;
   }
   //
-  public function update( int $limit = 0, int $offset = 0, bool $reset = true ): int {
+  public function update( int $limit = 0, int $offset = 0, bool $reset = true ): array {
     $result = $this->invoke( static::METHOD_UPDATE, $limit, $offset );
 
     if( $reset ) $this->set();
     return $result;
   }
   //
-  public function remove( int $limit = 0, int $offset = 0, bool $reset = true ): int {
+  public function remove( int $limit = 0, int $offset = 0, bool $reset = true ): array {
     $result = $this->invoke( static::METHOD_REMOVE, $limit, $offset );
 
     if( $reset ) $this->set();
@@ -356,6 +378,19 @@ abstract class Model implements ModelInterface {
 
     if( $reset ) $this->set();
     return $result;
+  }
+
+  //
+  public function field( string $name, int $offset = 0, bool $reset = true ) {
+
+    $result = $this->fieldList( $name, 1, $offset, $reset );
+    return !empty( $result ) ? $result[ 0 ] : null;
+  }
+  //
+  public function fieldList( string $name, int $limit = 0, int $offset = 0, bool $reset = true ): array {
+
+    $list = $this->addField( [ $name ] )->search( $limit, $offset, $reset );
+    return Collection::remapAll( $list, $name );
   }
 
   //
@@ -401,14 +436,17 @@ abstract class Model implements ModelInterface {
     else if( $limit < 0 || $offset < 0 ) throw new \InvalidArgumentException( "Limit ({$limit}) and offset ({$offset}) must be greater (or equal) than zero" );
     else {
 
+      $_offset = 0;
       do {
 
-        $next = $limit && ( $limit - $offset ) < $chunk ? ( $limit - $offset ) : $chunk;
-        $list = $this->search( $next, $offset );
-        if( $callback( $list, $offset ) === false ) break;
-        else $offset += $next;
+        $next = $limit && ( $limit - $_offset ) < $chunk ? ( $limit - $_offset ) : $chunk;
+        $list = $this->search( $next, $_offset + $offset, false );
+        if( !empty( $list ) ) {
+          if( $callback( $list, $_offset ) === false ) break;
+          else $_offset += $next;
+        }
 
-      } while( count( $list ) && ( $limit < 1 || $limit > $offset ) );
+      } while( !empty( $list ) && ( $limit < 1 || $limit > ( $_offset + $offset ) ) );
     }
 
     if( $reset ) $this->set();
@@ -416,7 +454,7 @@ abstract class Model implements ModelInterface {
   }
   //
   public function count( bool $reset = true ): int {
-    return count( $this->search( $reset ) );
+    return count( $this->search( 0, 0, $reset ) );
   }
 
   //
@@ -443,8 +481,8 @@ abstract class Model implements ModelInterface {
     return null;
   }
   //
-  public function item( array $context = null, ?array $key = null ): ItemInterface {
-    return new Model\Item( $this, $context, $key );
+  public function item( ?array $context = null, ?array $key = null ): ItemInterface {
+    return new Model\Item( $this, $context ?? [], $key );
   }
   //
   public function set( ?array $filter = null, ?array $field = null, ?array $sort = null ) {
@@ -506,7 +544,7 @@ abstract class Model implements ModelInterface {
         // remove fields that are not updatable
         foreach( $field_list as $field ) {
           if( ( $field->getFlag() & Field::FLAG_STATIC ) && $model->getField( 0, $field->getName() ) ) {
-            $model->removeField( [ $field->getName() ] );
+            $model->removeField( [ $field->getName() ], 0 );
           }
         }
 
@@ -552,7 +590,7 @@ abstract class Model implements ModelInterface {
    * This will use the current model's data, and the provided limits to run the method
    *
    * @param string   $method
-   * @param int|null $limit
+   * @param int  $limit
    * @param int      $offset
    *
    * @return array|int
@@ -567,7 +605,7 @@ abstract class Model implements ModelInterface {
 
       //
       $tmp = $statement( $limit, $offset );
-      if( !is_array( $tmp ) ) $result = $tmp;
+      if( $method !== static::METHOD_SEARCH ) $result = $tmp;
       else {
 
         $result = [];
@@ -597,7 +635,7 @@ abstract class Model implements ModelInterface {
     if( !Collection::isNumeric( $list ) ) throw new \InvalidArgumentException( 'List must be a numeric array' );
     else {
 
-      // check for inner arrays
+      // add every inner arrays
       $slot = 0;
       foreach( $list as $field_list ) {
         $this->addField( $field_list, false, $slot++ );
@@ -608,6 +646,7 @@ abstract class Model implements ModelInterface {
   }
   //
   public function addField( array $list, bool $merge = true, ?int $slot = 0 ) {
+    $slot = $slot === null ? count( $this->_field ) : $slot;
 
     // handle adding of all fields
     if( $list === static::FIELD_ALL ) {
@@ -615,7 +654,11 @@ abstract class Model implements ModelInterface {
       $list = [];
       foreach( $this->getDefinitionList( DefinitionInterface::FIELD ) as $field ) {
         /** @var Definition\Field $field */
-        $list[ $field->getName() ] = null;
+
+        // skip any field that has already added to prevent value overwrites
+        if( $this->getField( $slot, $field->getName() ) === null ) {
+          $list[ $field->getName() ] = null;
+        }
       }
     }
 
@@ -626,13 +669,15 @@ abstract class Model implements ModelInterface {
       else $_list[ $key ] = $value;
     }
 
-    $slot                  = $slot === null ? count( $this->_field ) : $slot;
-    $this->_field[ $slot ] = $_list + ( $merge ? ( $this->_field[ $slot ] ?? [] ) : [] );
+    //
+    if( !empty( $_list ) ) {
+      $this->_field[ $slot ] = $_list + ( $merge ? ( $this->_field[ $slot ] ?? [] ) : [] );
+    }
 
     return $this;
   }
   //
-  public function removeField( ?array $list = null, ?int $slot = 0 ) {
+  public function removeField( ?array $list = null, ?int $slot = null ) {
 
     // handle simple versions (clear all, and all in a slot)
     if( $list === null && $slot === null ) $this->_field = [];
@@ -640,9 +685,24 @@ abstract class Model implements ModelInterface {
     else {
 
       foreach( $list as $name ) {
-        if( $slot !== null ) unset( $this->_field[ $slot ][ $name ] );
-        else foreach( $this->_field as $i => $fields ) {
-          unset( $this->_field[ $i ][ $name ] );
+        if( $slot !== null ) {
+          unset( $this->_field[ $slot ][ $name ] );
+
+          // removes the slot if it's become empty
+          if( empty( $this->_field[ $slot ] ) ) {
+            unset( $this->_field[ $slot ] );
+          }
+
+        } else {
+
+          foreach( $this->_field as $i => $_ ) {
+            unset( $this->_field[ $i ][ $name ] );
+
+            // removes the slot if it's become empty
+            if( empty( $this->_field[ $i ] ) ) {
+              unset( $this->_field[ $i ] );
+            }
+          }
         }
       }
     }
