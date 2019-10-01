@@ -2,10 +2,8 @@
 
 use Spoom\Core;
 
-/**
- * Class Extension
- */
-class Extension extends Core\Extension {
+//
+class Package extends Core\Package {
 
   const ID   = 'spoom-mvc';
   const ROOT = __DIR__ . '/../';

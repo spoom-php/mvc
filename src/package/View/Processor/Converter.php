@@ -45,7 +45,7 @@ class Converter implements ProcessorInterface, Helper\AccessableInterface {
 
     // TODO remove empty (===null) values from the view (based on the _empty property)
 
-    return $this->_converter->serialize( Helper\Collection::read( $view ), $stream );
+    return $this->_converter->serialize( Helper\Collection::cast( $view ), $stream );
   }
 
   /**

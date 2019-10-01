@@ -1,7 +1,7 @@
-[![Build Status](https://travis-ci.org/spoom-php/mvc.svg?branch=development)](https://travis-ci.org/spoom-php/mvc)  
+[![Build Status](https://travis-ci.org/spoom-php/mvc.svg?branch=development)](https://travis-ci.org/spoom-php/mvc)
 
 # Spoom Framework
-Spoom is a collection of cooperative libraries (extensions), which you can use to "build" a framework that suits your needs.
+Spoom is a collection of cooperative packages, which you can use to code your Application of needs.
 
 ## About the MVC
 ...

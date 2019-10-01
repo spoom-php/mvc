@@ -1,8 +1,8 @@
 {
   "name": "spoom-php/mvc",
-  "description": "MVC support for Spoom Framework",
-  "keywords": [ "spoom", "mvc" ],
-  "type": "spoom-extension",
+  "description": "MVC support for Spoom Packages",
+  "keywords": [ "spoom", "model", "view", "controller", "mvc", "hmvc" ],
+  "type": "spoom",
   "license": "MIT",
   "authors": [
     {
@@ -12,11 +12,11 @@
 
   "require": {
     "php": "^7.1.0",
-    "spoom-php/composer": "^1.0.0",
+    "spoom-php/composer": "^1.1.1",
     "spoom-php/core": "@dev"
   },
 
   "autoload": {
-    "psr-4": { "Spoom\\MVC\\": "src/extension/" }
+    "psr-4": { "Spoom\\MVC\\": "src/package/" }
   }
 }

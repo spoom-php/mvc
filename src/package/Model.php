@@ -382,7 +382,7 @@ abstract class Model implements ModelInterface {
   public function fieldList( string $name, int $limit = 0, int $offset = 0, bool $reset = true ): array {
 
     $list = $this->addField( [ $name ] )->search( $limit, $offset, $reset );
-    return Collection::remapAll( $list, $name );
+    return Collection::mapList( $list, $name );
   }
 
   //
@@ -453,7 +453,7 @@ abstract class Model implements ModelInterface {
   public function key( $context, bool $primary = false ): ?array {
 
     //
-    $context = Collection::read( $context, [] );
+    $context = Collection::cast( $context, [] );
     foreach( $this->_key as $i => $keys ) {
 
       // $this->_key[0] is the primary key

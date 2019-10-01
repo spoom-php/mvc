@@ -15,4 +15,4 @@ composer.phar
 composer.lock
 
 # Spoom Framework
-/spoom/extension.php
+/spoom/package.php

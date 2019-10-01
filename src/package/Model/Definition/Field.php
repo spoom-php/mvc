@@ -159,7 +159,7 @@ class FieldForeign extends Model\Definition {
           $foreign_map = [];
 
           // merge default field search params with the one added from the model
-          $_search = Collection::read( $operator_list[ Model\Operator::DEFAULT ], [] ) + [ [],[],[] ];
+          $_search = Collection::cast( $operator_list[ Model\Operator::DEFAULT ], [] ) + [ [],[],[] ];
           $search = array_reduce( [ 0, 1, 2 ], function( $list, $i ) use ( $_search ) {
             $list[ $i ] += $_search[ $i ] ?? [];
             return $list;
@@ -171,7 +171,7 @@ class FieldForeign extends Model\Definition {
           foreach( $foreign_list as $foreign_item ) {
 
             $key_list = $foreign_item[ $this->_foreign_key ] ?? [];
-            foreach( Collection::read( $key_list, [ $key_list ] ) as $key ) {
+            foreach( Collection::cast( $key_list, [ $key_list ] ) as $key ) {
               if( $this->_multiple === null ) $foreign_map[ $key ] = $foreign_map[ $key ] ?? $foreign_item;
               else {
 

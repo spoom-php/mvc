@@ -133,7 +133,7 @@ class FormatterNumber extends Formatter {
       }
 
       // FIXME change this after `Helper\Number::read` supports precision
-      $input = round( Helper\Number::read( $input, 0 ), $this->precision );
+      $input = round( Helper\Number::cast( $input, 0 ), $this->precision );
       if( $this->precision === 0 ) $input = intval( $input );
     }
 
@@ -175,7 +175,7 @@ class FormatterString extends Formatter {
   public function __invoke( $input, array $list, Field $field, int $slot ) {
 
     if( $input !== null ) {
-      $input = Helper\Text::read( $input );
+      $input = Helper\Text::cast( $input );
 
       if( $this->isWrite( $field ) ) {
         $length = function_exists( 'mb_strlen' ) ? mb_strlen( $input ) : strlen( $input );
