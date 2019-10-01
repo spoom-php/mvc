@@ -1,40 +1,31 @@
 <?php namespace Spoom\MVC\Model\Definition;
 
-use Spoom\Core\Helper\Number;
 use Spoom\MVC\Model;
+use Spoom\MVC\Model\StatementInterface;
 
 //
 class Sort extends Model\Definition {
 
   /**
-   * @param string $name     Field name that is being sorted
-   * @param string $operator Default operator
+   * @param string      $name     Field name that is being sorted
+   * @param null|string $field
+   * @param string      $operator Default operator
+   *
+   * @throws \InvalidArgumentException
    */
-  public function __construct( string $name, string $operator = Model\Operator::DEFAULT ) {
-    parent::__construct( $name, $operator, [ Model\Operator::DEFAULT, Model\Operator::FLAG_NOT ] );
+  public function __construct( string $name, ?string $field = null, string $operator = Model\Operator::DEFAULT ) {
+    parent::__construct( $name, $field, $operator, [ Model\Operator::DEFAULT, Model\Operator::FLAG_NOT ] );
   }
 
   //
-  public function execute( array $list, array $_list = [] ): array {
-
-    foreach( ( $this->slot_list[ 0 ] ?? [] ) as $operator => $value ) {
-
-      $_operator = $this->operator( $operator );
-      usort( $list, $_operator->isNot() ? function ( $item, $_item ) {
-        $test  = $item[ $this->getName() ] ?? null;
-        $_test = $_item[ $this->getName() ] ?? null;
-
-        return Number::is( $test ) && Number::is( $_test ) ? $_test - $test : strcmp( $_test, $test );
-      } : function ( $item, $_item ) {
-        $test  = $item[ $this->getName() ] ?? null;
-        $_test = $_item[ $this->getName() ] ?? null;
-
-        return Number::is( $test ) && Number::is( $_test ) ? $test - $_test : strcmp( $test, $_test );
-      } );
-    }
-
-    return $list;
+  public function __invoke( ?array &$_, ?array $__ ) {
+    return false;
   }
+
+  // There is no need to revert anything on error
+  public function revert( \Throwable $_, ?array $__ ) {}
+  // There is no need to apply the definition
+  public function apply( ?array &$_, ?array $__ ) {}
 
   //
   public function getType() {
@@ -56,25 +47,35 @@ class SortRandom extends Model\Definition {
    * @throws \InvalidArgumentException
    */
   public function __construct( string $name, ?int $seed = null ) {
-    parent::__construct( $name, null, [] );
+    parent::__construct( $name, null, null, [] );
 
     $this->_seed = $seed;
   }
 
   //
-  public function execute( array $list, array $_list = [] ): array {
-
+  public function __invoke( array &$list, array $_ ) {
     if( $this->_seed === null ) shuffle( $list );
     else {
 
       mt_srand( $this->_seed );
-      $order = array_map( function () { return mt_rand(); }, range( 1, count( $list ) ) );
+      $order = array_map( function ( $_ ) { return mt_rand(); }, range( 1, count( $list ) ) );
       array_multisort( $order, $list );
       mt_srand();
     }
 
-    return $list;
+    return true;
   }
+
+  //
+  public function attach( StatementInterface $statement ) {
+    if( !( $statement instanceof Model\Statement ) ) throw new \TypeError( 'Statement must be an instance of ' . Model\Statement::class . ' in order to use this type of sorting' );
+    else parent::attach( $statement );
+  }
+
+  // There is no need to revert anything on error
+  public function revert( \Throwable $_, array $__ ) {}
+  // There is no need to apply the definition
+  public function apply( array &$_, array $__ ) {}
 
   /**
    * @return int|null

@@ -1,37 +1,79 @@
 <?php namespace Spoom\MVC\Model;
 
-use Spoom\MVC\Model;
-
 //
 interface DefinitionInterface {
 
-  const FILTER = 'filter';
   const FIELD  = 'field';
+  const FILTER = 'filter';
   const SORT   = 'sort';
 
-  //
+  /**
+   *
+   */
   public function __clone();
+  /**
+   * Custom execution in the statement
+   *
+   * @param array $list The current list contains every change
+   * @param array $_list The original list from the storage
+   *
+   * @return bool This must be true to skip the default definition processing by the statement
+   */
+  public function __invoke( array &$list, array $_list );
 
   /**
-   * @param StatementInterface $statement
-   */
-  public function setup( StatementInterface $statement );
-  /**
-   * @param array $list
-   * @param array $_list
+   * Attach the definition for the Statement
    *
-   * @return array
+   * This will be called before any statement execution. The `$statement` input should be saved in the definition
+   * for the next calls (`->__invoke()`, `->apply()`, `->revert()` and `detach()`)
+   *
+   * @param StatementInterface $statement The statement to apply
    */
-  public function execute( array $list, array $_list = [] ): array;
+  public function attach( StatementInterface $statement );
+  /**
+   * Revert applied modifications due to an exception
+   *
+   * This will be called after any exception occur in the statement execution process. This can be before the `->attach()` method, so
+   * the stored statement may be null
+   *
+   * @param \Throwable $exception
+   * @param array $_list The original result list
+   */
+  public function revert( \Throwable $exception, array $_list );
+  /**
+   * Complete definitions for the statement
+   *
+   * @param array $list The result list modified by the previous definitions
+   * @param array $_list The original result list
+   */
+  public function apply( array &$list, array $_list );
+  /**
+   * Detach from the Statement
+   *
+   * This is the last method called in the Statement execution, even after an `revert()`
+   *
+   * @param array $list The result list modified by the previous definitions
+   * @param array $_list The original result list
+   */
+  public function detach( array $list, array $_list );
 
   /**
-   * Add or replace new operator for the definition
+   * Add or replace value for an operator
    *
-   * @param string     $operator
    * @param mixed|null $value
+   * @param string     $operator
    * @param int        $slot
+   *
+   * @return static
    */
-  public function setOperator( string $operator, $value = null, int $slot = 0 );
+  public function set( $value = null, string $operator = Operator::DEFAULT, int $slot = 0 );
+  /**
+   * @param int|null    $slot
+   * @param string|null $operator
+   *
+   * @return array|mixed
+   */
+  public function get( ?int $slot = null, string $operator = null );
 
   /**
    * @return int
@@ -60,7 +102,7 @@ abstract class Definition implements DefinitionInterface {
   const FLAG_NONE = 0;
 
   /**
-   * @var StatementInterface
+   * @var StatementInterface|null
    */
   protected $_statement;
   /**
@@ -76,6 +118,10 @@ abstract class Definition implements DefinitionInterface {
    * @var string
    */
   private $_name;
+  /**
+   * @var string|null
+   */
+  private $_field;
 
   /**
    * @var string|null
@@ -92,7 +138,7 @@ abstract class Definition implements DefinitionInterface {
    * @param array|null  $operator_list
    * @param int         $flag
    */
-  public function __construct( string $name, ?string $operator = null, ?array $operator_list = null, int $flag = self::FLAG_NONE ) {
+  public function __construct( string $name, ?string $field, ?string $operator = null, ?array $operator_list = null, int $flag = self::FLAG_NONE ) {
 
     // check default operator availability
     if( $operator_list !== null && $operator !== null && !in_array( $operator, $operator_list ) ) {
@@ -100,6 +146,7 @@ abstract class Definition implements DefinitionInterface {
     }
 
     $this->_name = $name;
+    $this->_field = $field;
     $this->_flag = $flag;
 
     $this->_operator      = $operator;
@@ -108,25 +155,22 @@ abstract class Definition implements DefinitionInterface {
   //
   public function __clone() { }
 
-  public function setup( StatementInterface $statement ) {
+  //
+  public function attach( StatementInterface $statement ) {
     $this->_statement = $statement;
   }
-  /**
-   * @param null|string $value
-   *
-   * @return Model\Operator
-   * @throws \InvalidArgumentException Not available operator
-   */
-  protected function operator( ?string $value = null ): Model\Operator {
-
-    $result = $value ?? $this->_operator;
-    if( $this->_operator_list !== null && empty( $this->_operator_list ) ) throw new \LogicException( 'This definition doesn\'t have any operator!' );
-    else if( $this->_operator_list !== null && !in_array( $result, $this->_operator_list ) ) throw new \InvalidArgumentException( 'Operator must be one of the following: ' . implode( ', ', $this->_operator_list ) );
-    else return new Model\Operator( $result );
+  //
+  public function detach( array $list, array $_list ) {
+    $this->_statement = null;
   }
 
   //
-  public function setOperator( string $operator, $value = null, int $slot = 0 ) {
+  public function set( $value = null, string $operator = Operator::DEFAULT, int $slot = 0 ) {
+
+    $operator = $this->_operator !== null && $operator === Operator::DEFAULT ? $this->_operator : $operator;
+    if( $this->_operator_list !== null && !in_array( $operator, $this->_operator_list ) ) {
+      throw new \InvalidArgumentException( 'Operator must be one of the following: ' . implode( ', ', $this->_operator_list ) );
+    }
 
     //
     if( !array_key_exists( $slot, $this->slot_list ) ) {
@@ -134,11 +178,22 @@ abstract class Definition implements DefinitionInterface {
     }
 
     $this->slot_list[ $slot ][ $operator ] = $value;
+    return $this;
+  }
+  //
+  public function get( ?int $slot = null, string $operator = null ) {
+
+    //
+    if( $operator === null ) return ($slot === null ? $this->slot_list : ($this->slot_list[ $slot ] ?? []));
+    else {
+
+      //
+      $operator = $this->_operator !== null && $operator === Operator::DEFAULT ? $this->_operator : $operator;
+      return $this->slot_list[ $slot ][ $operator ] ?? null;
+    }
   }
 
-  /**
-   * @return int
-   */
+  //
   public function getFlag(): int {
     return $this->_flag;
   }
@@ -152,6 +207,7 @@ abstract class Definition implements DefinitionInterface {
     $this->_flag = $value;
     return $this;
   }
+
   //
   public function getStatement(): StatementInterface {
     return $this->_statement;
@@ -160,6 +216,15 @@ abstract class Definition implements DefinitionInterface {
   public function getName() {
     return $this->_name;
   }
+  /**
+   * @param bool $fallback Returns the definition's name when the field is empty
+   *
+   * @return string|null
+   */
+  public function getField( bool $fallback = false ): ?string {
+    return $this->_field ?? ( $fallback ? $this->getName() : null );
+  }
+
   /**
    * Available operators
    *

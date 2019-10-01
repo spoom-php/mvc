@@ -4,10 +4,10 @@ use Spoom\Core\Helper\Collection;
 use Spoom\Core\Helper\Number;
 use Spoom\MVC\Model\Definition\Field;
 use Spoom\MVC\Model\DefinitionInterface;
-use Spoom\MVC\Model\ItemInterface;
 
 /**
  * TODO model should support aggregations
+ * TODO model should support backup/restore
  */
 interface ModelInterface {
 
@@ -27,7 +27,7 @@ interface ModelInterface {
    * @param int  $offset
    * @param bool $reset Reset the internal state, after the command
    *
-   * @return array
+   * @return array List with the created or modified item's keys, in the order of the provided field slots
    */
   public function create( int $limit = 1, int $offset = 0, bool $reset = true ): array;
   /**
@@ -39,7 +39,7 @@ interface ModelInterface {
    * @param int  $offset
    * @param bool $reset Reset the internal state, after the command
    *
-   * @return array
+   * @return array List with the removed item's keys, in the order of the remove
    */
   public function remove( int $limit = 0, int $offset = 0, bool $reset = true ): array;
   /**
@@ -51,7 +51,7 @@ interface ModelInterface {
    * @param int  $offset
    * @param bool $reset Reset the internal state, after the command
    *
-   * @return array
+   * @return array List with the modified item's keys, in the order of the update
    */
   public function update( int $limit = 0, int $offset = 0, bool $reset = true ): array;
   /**
@@ -63,7 +63,7 @@ interface ModelInterface {
    * @param int  $offset
    * @param bool $reset Reset the internal state, after the command
    *
-   * @return array
+   * @return array[] Zero indexed list with the items data as any associative array
    */
   public function search( int $limit = 0, int $offset = 0, bool $reset = true ): array;
 
@@ -105,9 +105,9 @@ interface ModelInterface {
    * @param int  $offset The returned item offset in the result array
    * @param bool $reset  Reset the internal state, after the command
    *
-   * @return null|ItemInterface
+   * @return null|array
    */
-  public function get( int $offset = 0, bool $reset = true ): ?ItemInterface;
+  public function get( int $offset = 0, bool $reset = true ): ?array;
   /**
    * Process a huge search result chunked to prevent memory issues
    *
@@ -138,17 +138,6 @@ interface ModelInterface {
    * @return array|null
    */
   public function key( $context, bool $primary = false ): ?array;
-  /**
-   * Create an item object
-   *
-   * With or without predefined data
-   *
-   * @param array|null $context Initial data if any
-   * @param array|null $key     Key of the item if any
-   *
-   * @return ItemInterface
-   */
-  public function item( ?array $context = null, ?array $key = null ): ItemInterface;
   /**
    * Set (or clear) internal state in one command
    *
@@ -293,15 +282,15 @@ interface ModelInterface {
    */
   public function getKey( $primary = false ): array;
   /**
-   * Get filter/field/sort or limit definitions
+   * Get filter/field/sort definitions
    *
    * @param string|null $type Definition's type or ===null to all definition
    *
-   * @return DefinitionInterface[]|DefinitionInterface[][]
+   * @return array<string,array<string,DefinitionInterface>>|array<string,DefinitionInterface>
    */
   public function getDefinitionList( string $type = null ): array;
   /**
-   * Get filter/field/sort or limit definitions
+   * Get filter/field/sort definitions
    *
    * @param string $type
    * @param string $name
@@ -310,11 +299,11 @@ interface ModelInterface {
    * @throws \InvalidArgumentException
    * @throws \LogicException
    */
-  public function getDefinition( string $type, string $name );
+  public function getDefinition( string $type, string $name ): DefinitionInterface;
 }
 //
 abstract class Model implements ModelInterface {
-  // FIXME there should be a __clone implementation to prevent linked data problems, but be careful with the performance impact
+  // TODO there should be a __clone implementation to prevent linked data problems, but be careful with the performance impact
 
   /**
    * Multiple key definitions in order (first is the primary key)
@@ -377,14 +366,17 @@ abstract class Model implements ModelInterface {
     $result = $this->invoke( static::METHOD_SEARCH, $limit, $offset );
 
     if( $reset ) $this->set();
-    return $result;
+
+    // `->invoke()` tries to keep the item indexes of the input fields, but in the search that doesn't matter (there must be only one field slot anyway)
+    // and it's easier to use the result list from zero indexes later
+    return array_values( $result );
   }
 
   //
   public function field( string $name, int $offset = 0, bool $reset = true ) {
 
     $result = $this->fieldList( $name, 1, $offset, $reset );
-    return !empty( $result ) ? $result[ 0 ] : null;
+    return !empty( $result ) ? $result[0] : null;
   }
   //
   public function fieldList( string $name, int $limit = 0, int $offset = 0, bool $reset = true ): array {
@@ -423,10 +415,10 @@ abstract class Model implements ModelInterface {
     return $result;
   }
   //
-  public function get( int $offset = 0, bool $reset = true ): ?ItemInterface {
+  public function get( int $offset = 0, bool $reset = true ): ?array {
 
     $result = $this->search( 1, $offset, $reset );
-    return !empty( $result ) ? $result[ 0 ] : null;
+    return !empty( $result ) ? $result[0] : null;
   }
   //
   public function each( callable $callback, int $chunk, int $limit = 0, int $offset = 0, bool $reset = true ) {
@@ -481,10 +473,6 @@ abstract class Model implements ModelInterface {
     return null;
   }
   //
-  public function item( ?array $context = null, ?array $key = null ): ItemInterface {
-    return new Model\Item( $this, $context ?? [], $key );
-  }
-  //
   public function set( ?array $filter = null, ?array $field = null, ?array $sort = null ) {
 
     $filter === null ? $this->removeFilter() : $this->setFilter( $filter );
@@ -494,127 +482,26 @@ abstract class Model implements ModelInterface {
     return $this;
   }
 
-  /**
-   * Apply model to a statement
-   *
-   * @param Model\StatementInterface $statement
-   *
-   * @return Model\StatementInterface
-   * @throws \InvalidArgumentException
-   * @throws \LogicException
-   */
-  protected function apply( Model\StatementInterface $statement ) {
-    $model = clone $this;
 
-    $field_list = $this->getDefinitionList( Model\Definition::FIELD );
-    switch( $statement->getMethod() ) {
-      //
-      case static::METHOD_SEARCH:
-
-        // add default fields that is not already in the model
-        foreach( $field_list as $field ) {
-          if( !( $field->getFlag() & Field::FLAG_MANUAL ) && !$model->getField( 0, $field->getName() ) ) {
-            // TODO add support for a default value
-            $model->addField( [ $field->getName() => null ] );
-          }
-        }
-
-        break;
-
-      case static::METHOD_CREATE:
-
-        // add default create values for fields that is flagged as required and not already in the model
-        foreach( $field_list as $field ) {
-          if( $field->getFlag() & Field::FLAG_REQUIRED ) {
-
-            $slot_list = $model->getField();
-            foreach( $slot_list as $slot => $_field_list ) {
-              if( !isset( $_field_list[ $field->getName() ] ) ) {
-                // TODO add support for a default value
-                $model->addField( [ $field->getName() => null ], true, $slot );
-              }
-            }
-          }
-        }
-
-        break;
-
-      case static::METHOD_UPDATE:
-
-        // remove fields that are not updatable
-        foreach( $field_list as $field ) {
-          if( ( $field->getFlag() & Field::FLAG_STATIC ) && $model->getField( 0, $field->getName() ) ) {
-            $model->removeField( [ $field->getName() ], 0 );
-          }
-        }
-
-        break;
-    }
-
-    // add fields from the model into the statement
-    foreach( $model->getField() as $slot => $field_list ) {
-      foreach( $field_list as $name => $value ) {
-        $operator   = null;
-        $definition = $model->getDefinition( Model\Definition::FIELD, static::definition( $name, $operator ) );
-        $statement->addDefinition( $definition, $operator, $value, $slot );
-      }
-    }
-
-    switch( $statement->getMethod() ) {
-      case static::METHOD_UPDATE:
-      case static::METHOD_REMOVE:
-      case static::METHOD_SEARCH:
-
-        //
-        foreach( $model->getFilter() as $name => $value ) {
-          $operator   = null;
-          $definition = $model->getDefinition( Model\Definition::FILTER, static::definition( $name, $operator ) );
-          $statement->addDefinition( $definition, $operator, $value );
-        }
-
-        //
-        foreach( $model->getSort() as $name ) {
-          $operator   = null;
-          $definition = $model->getDefinition( Model\Definition::SORT, static::definition( $name, $operator ) );
-          $statement->addDefinition( $definition, $operator, null );
-        }
-
-        break;
-    }
-
-    return $statement;
-  }
   /**
    * Invoke statement based on the model
    *
    * This will use the current model's data, and the provided limits to run the method
    *
-   * @param string   $method
-   * @param int  $limit
-   * @param int      $offset
+   * @param string $method
+   * @param int    $limit
+   * @param int    $offset
    *
-   * @return array|int
+   * @return array
    * @throws \InvalidArgumentException When the offset or the limit less than zero
    */
-  protected function invoke( string $method, int $limit = 0, int $offset = 0 ) {
+  protected function invoke( string $method, int $limit = 0, int $offset = 0 ): array {
 
     if( $limit < 0 || $offset < 0 ) throw new \InvalidArgumentException( "Limit ({$limit}) and offset ({$offset}) must be greater (or equal) than zero" );
     else {
 
       $statement = $this->statement( $method );
-
-      //
-      $tmp = $statement( $limit, $offset );
-      if( $method !== static::METHOD_SEARCH ) $result = $tmp;
-      else {
-
-        $result = [];
-        foreach( $tmp as $item ) {
-          $result[] = $this->item( $item, $this->key( $item ) );
-        }
-      }
-
-      return $result;
+      return $statement( $limit, $offset );
     }
   }
 
@@ -723,7 +610,7 @@ abstract class Model implements ModelInterface {
   //
   public function addFilter( string $name, $value, string $operator = Model\Operator::DEFAULT ) {
 
-    $this->_filter[ static::definition( $name, $operator ) ] = $value;
+    $this->_filter[ Model\Operator::attach( $operator, $name ) ] = $value;
     return $this;
   }
   //
@@ -764,7 +651,7 @@ abstract class Model implements ModelInterface {
 
     // prepend operator and prevent duplicates (keep only the latest one)
     $operator = $reverse ? Model\Operator::FLAG_NOT : Model\Operator::DEFAULT;
-    $name     = static::definition( $name, $operator );
+    $name     = Model\Operator::attach( $operator, $name );
     $this->removeSort( [ $name ] );
 
     $this->_sort[] = $name;
@@ -820,24 +707,109 @@ abstract class Model implements ModelInterface {
     else if( !isset( $this->_definition[ $type ] ) ) throw new \InvalidArgumentException( 'Type must be: ' . implode( ', ', array_keys( $this->_definition ) ) );
     else return $this->_definition[ $type ];
   }
-  //
-  public function getDefinition( string $type, string $name ) {
-
-    $list = $this->getDefinitionList( $type );
-    if( !isset( $list[ $name ] ) ) throw new \LogicException( "There is no definition for '{$name}' {$type} in " . get_class( $this ) );
-    else return $list[ $name ];
-  }
-
   /**
-   * Add a new definition to the model
+   * Make a definition list for the $method type
    *
-   * @param DefinitionInterface $definition
+   * This should be used to push definition list into Statement's
    *
+   * @param string $method
+   *
+   * @return array<string,array<string,DefinitionInterface>>
    * @throws \InvalidArgumentException
+   * @throws \LogicException
    */
-  protected function addDefinition( DefinitionInterface $definition ) {
-    if( !isset( $this->_definition[ $definition->getType() ] ) ) throw new \InvalidArgumentException( 'Type must be: ' . implode( ', ', array_keys( $this->_definition ) ) );
-    else $this->_definition[ $definition->getType() ][ $definition->getName() ] = $definition;
+  protected function makeDefinitionList( string $method ): array {
+    $model = clone $this;
+    $definition_list = Collection::copy( $model->getDefinitionList() );
+
+    switch( $method ) {
+      //
+      case static::METHOD_SEARCH:
+
+        // add default fields that is not already in the model
+        foreach( $definition_list[ Model\Definition::FIELD ] as $field ) {
+          if( !( $field->getFlag() & Field::FLAG_MANUAL ) && !$model->getField( 0, $field->getName() ) ) {
+            // TODO add support for a default value
+            $model->addField( [ $field->getName() => null ] );
+          }
+        }
+
+        break;
+
+      case static::METHOD_CREATE:
+
+        // add default create values for fields that is flagged as required and not already in the model
+        foreach( $definition_list[ Model\Definition::FIELD ] as $field ) {
+          if( $field->getFlag() & Field::FLAG_REQUIRED ) {
+
+            $slot_list = $model->getField();
+            foreach( $slot_list as $slot => $_field_list ) {
+              if( !isset( $_field_list[ $field->getName() ] ) ) {
+                // TODO add support for a default value
+                $model->addField( [ $field->getName() => null ], true, $slot );
+              }
+            }
+          }
+        }
+
+        break;
+
+      case static::METHOD_UPDATE:
+
+        // remove fields that are not updatable
+        foreach( $definition_list[ Model\Definition::FIELD ] as $field ) {
+          if( ( $field->getFlag() & Field::FLAG_STATIC ) && $model->getField( 0, $field->getName() ) ) {
+            $model->removeField( [ $field->getName() ], 0 );
+          }
+        }
+
+        break;
+    }
+
+    // add fields from the model into the statement
+    foreach( $model->getField() as $slot => $field_list ) {
+      foreach( $field_list as $name => $value ) {
+        $operator   = null;
+        $definition = $definition_list[ Model\Definition::FIELD ][ Model\Operator::detach( $name, $operator ) ] ?? null;
+        if( empty( $definition ) ) throw new \LogicException( "There is no definition for '{$name}' " . Model\Definition::FIELD . " in " . get_class( $model ) );
+        else $definition->set( $value, $operator, $slot );
+      }
+    }
+
+    switch( $method ) {
+      case static::METHOD_UPDATE:
+      case static::METHOD_REMOVE:
+      case static::METHOD_SEARCH:
+
+        //
+        foreach( $model->getFilter() as $name => $value ) {
+          $operator   = null;
+          $definition = $definition_list[ Model\Definition::FILTER ][ Model\Operator::detach( $name, $operator ) ] ?? null;
+          if( empty( $definition ) ) throw new \LogicException( "There is no definition for '{$name}' " . Model\Definition::FILTER . " in " . get_class( $model ) );
+          else $definition->set( $value, $operator );
+        }
+
+        //
+        foreach( $model->getSort() as $name ) {
+          $operator   = null;
+          $definition = $definition_list[ Model\Definition::SORT ][ Model\Operator::detach( $name, $operator ) ] ?? null;
+          if( empty( $definition ) ) throw new \LogicException( "There is no definition for '{$name}' " . Model\Definition::SORT . " in " . get_class( $model ) );
+          else $definition->set( $value, $operator );
+        }
+
+        break;
+    }
+
+    // remove empty definitions
+    foreach( $definition_list as $type => $list ) {
+      foreach( $list as $name => $definition ) {
+        if( empty( $definition->get() ) ) {
+          unset( $definition_list[ $type ][ $name ] );
+        }
+      }
+    }
+
+    return $definition_list;
   }
   /**
    * Add multiple definition to the model
@@ -852,21 +824,22 @@ abstract class Model implements ModelInterface {
     }
   }
 
-  /**
-   * Separate or join definion name and operator
-   *
-   * @param string      $name
-   * @param string|null $operator NULL for extract
-   *
-   * @return string The name with or without the operator
-   */
-  public static function definition( $name, &$operator = null ) {
-    if( $operator !== null ) return $name . $operator;
-    else {
+  //
+  public function getDefinition( string $type, string $name ): DefinitionInterface {
 
-      $tmp      = preg_replace( '/[^a-z0-9_-]+$/i', '', $name );
-      $operator = substr( $name, strlen( $tmp ) );
-      return $tmp;
-    }
+    $list = $this->getDefinitionList( $type );
+    if( !isset( $list[ $name ] ) ) throw new \LogicException( "There is no definition for '{$name}' {$type} in " . get_class( $this ) );
+    else return $list[ $name ];
+  }
+  /**
+   * Add a new definition to the model
+   *
+   * @param DefinitionInterface $definition
+   *
+   * @throws \InvalidArgumentException
+   */
+  protected function addDefinition( DefinitionInterface $definition ) {
+    if( !isset( $this->_definition[ $definition->getType() ] ) ) throw new \InvalidArgumentException( 'Type must be: ' . implode( ', ', array_keys( $this->_definition ) ) );
+    else $this->_definition[ $definition->getType() ][ $definition->getName() ] = $definition;
   }
 }

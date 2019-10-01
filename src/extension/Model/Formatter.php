@@ -108,7 +108,7 @@ class FormatterNumber extends Formatter {
    * @param int|null $minimum   Minimum value on write (NULL means no limit)
    * @param int|null $maximum   Maximum value on write (NULL means no limit)
    * @param int      $precision Decimal count
-   * @param null     $default
+   * @param mixed    $default
    * @param bool     $nullable
    */
   public function __construct( ?int $minimum = null, ?int $maximum = null, int $precision = 0, $default = null, bool $nullable = true ) {

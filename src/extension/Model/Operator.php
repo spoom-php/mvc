@@ -152,4 +152,29 @@ class Operator {
   public function isAny(): bool {
     return $this->isFlag( static::FLAG_ANY );
   }
+
+  /**
+   * Attach $operator into a definition $name
+   *
+   * @param string $operator
+   * @param string $name
+   *
+   * @return string The $name with the attached $operator
+   */
+  public static function attach( string $operator, string $name ): string {
+    return $name . $operator;
+  }
+  /**
+   * Detach $operator from a definition $name
+   *
+   * @param string      $name A definition name with or without operator
+   * @param string|null $operator The detached operator "output" if any
+   *
+   * @return string The $name without the attached $operator
+   */
+  public static function detach( string $name, ?string &$operator = null ): string {
+    $tmp      = preg_replace( '/[^a-z0-9_-]+$/i', '', $name );
+    $operator = substr( $name, strlen( $tmp ) );
+    return $tmp;
+  }
 }
